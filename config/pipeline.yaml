@@ -1,0 +1,32 @@
+# Filtros de aceptación AUTOMÁTICA de fuentes (EDITABLE).
+# Son criterios objetivos y deterministas aplicados por el código, nunca por la IA.
+# NINGÚN criterio mide la fiabilidad, la postura ni la orientación de una fuente:
+# solo comprueban que el documento es legible, tiene que ver con el tema y no está repetido.
+# Cada fuente excluida queda registrada con su motivo en la página «Auditoría» del hecho.
+
+fuentes:
+  # Longitud mínima del texto descargado, en caracteres.
+  min_caracteres: 300
+
+  # Términos del tema que deben aparecer en el texto de la fuente.
+  # Los términos distintivos se derivan del tema quitando palabras vacías y los términos genéricos
+  # de abajo. Si el tema tiene nombres propios (palabras con mayúscula que no abren el tema),
+  # se exigen esos; si no, se exigen los términos distintivos restantes.
+  min_terminos_tema: 1
+
+  # Términos demasiado genéricos para ser distintivos (no cuentan como términos del tema).
+  terminos_genericos: [españa, español, española, madrid, caso, tema, hecho, noticia, noticias,
+                       gobierno, ministerio, ley, contrato, año, años, millones, euros, derecho]
+
+  # Máximo de fuentes aceptadas por dominio (evita que un solo medio domine).
+  max_por_dominio: 2
+
+  # Máximo total de fuentes aceptadas (limita el gasto de cuota en la extracción).
+  max_total: 12
+
+  # Texto casi idéntico: se excluye si la similitud (0 a 1, solapamiento de fragmentos de
+  # 5 palabras) con otra fuente ya aceptada supera este umbral.
+  umbral_duplicado: 0.85
+
+  # Descarga: máximo de URLs candidatas a descargar por investigación.
+  max_candidatas: 30

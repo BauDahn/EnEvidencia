@@ -1,18 +1,42 @@
-{% extends "base.html" %}{% block title %}{{ s.title or s.url }}{% endblock %}{% block content %}
-<h2>{{ s.title or s.url }}</h2>
-<p><a href="{{ s.url }}">{{ s.url }}</a><br>{{ s.outlet }} {{ s.author }} · {{ s.published or "fecha desconocida" }}</p>
-<p>Clasificación: <span class="tag">{{ s.source_type.label }}</span> — {{ s.classification_reason }}</p>
-<form method="post" action="/sources/{{ s.id }}/type"><select name="source_type">
- {% for t in types %}<option value="{{ t.value }}" {{ "selected" if t == s.source_type }}>{{ t.label }}</option>{% endfor %}</select>
- <button>Corregir clasificación</button></form>
-{% if error %}<p class="err">{{ error }}</p>{% endif %}
-<h3>Registrar afirmación</h3>
-<form method="post" action="/claims"><input type="hidden" name="source_id" value="{{ s.id }}">
- <select name="fact_id" required>{% for f in facts %}<option value="{{ f.id }}">{{ f.title }}</option>{% endfor %}</select>
- <input name="statement" placeholder="Afirmación (p. ej. La renta exigida era de 2.650 €)" required>
- <input name="speaker" placeholder="Quién lo dijo" required>
- <textarea name="quote" rows="3" placeholder="Cita textual (debe aparecer literalmente en el texto)" required></textarea>
- <input name="value" placeholder="Valor comparable opcional (p. ej. 2650 €)"><button>Guardar afirmación</button></form>
-{% if candidates %}<details><summary>Frases con cifras o citas ({{ candidates|length }})</summary><ul>{% for c in candidates %}<li>{{ c }}</li>{% endfor %}</ul></details>{% endif %}
-<h3>Texto original</h3><pre>{{ s.text }}</pre>
+{% extends "base.html" %}{% from "macros.html" import tipo, error as aviso_error %}{% set section = "fuentes" %}
+{% block title %}{{ s.title or s.url }} · EnEvidencia{% endblock %}
+{% block content %}
+<div class="dossier-head">
+ <p class="kicker">Fuente nº {{ s.id }}{% if s.kind %} · {{ s.kind }}{% endif %}</p>
+ <h1>{{ s.title or s.url }}</h1>
+ <p class="meta"><a href="{{ s.url|safe_href }}" rel="noopener noreferrer">{{ s.url }}</a></p>
+ <p class="dek" style="margin-top:.6rem">{{ s.outlet }} {{ s.author }} · {{ s.published or "fecha desconocida" }}</p>
+ <p class="dossier-note">Este portal muestra lo que dice cada fuente. No decide qué es verdad: la clasificación de fuentes es descriptiva, no un juicio de fiabilidad.</p>
+</div>
+{{ aviso_error(error) }}
+<div class="front" style="margin-top:1.5rem">
+ <div class="main">
+  <div class="section-label" style="margin-top:0">Texto original</div>
+  <pre class="source-text">{{ s.text }}</pre>
+  {% if candidates %}<details><summary>Frases con cifras o citas ({{ candidates|length }})</summary><ul>{% for c in candidates %}<li>{{ c }}</li>{% endfor %}</ul></details>{% endif %}
+ </div>
+ <aside aria-label="Ficha y formularios">
+  <section class="card-box">
+   <p class="kicker">Ficha</p>
+   <p>Clasificación: {{ tipo(s) }}</p><p class="meta" style="margin-bottom:.8rem">{{ s.classification_reason }}</p>
+   <form method="post" action="/sources/{{ s.id }}/type">
+    <label for="stype">Tipo de fuente</label>
+    <select id="stype" name="source_type">{% for t in types %}<option value="{{ t.value }}" {{ "selected" if t == s.source_type }}>{{ t.label }}</option>{% endfor %}</select>
+    <button class="secondary">Corregir clasificación</button></form>
+  </section>
+  <section class="card-box">
+   <h2>Registrar afirmación</h2>
+   {% if facts %}
+   <form method="post" action="/claims"><input type="hidden" name="source_id" value="{{ s.id }}">
+    <label for="c-fact">Hecho</label>
+    <select id="c-fact" name="fact_id" required>{% for f in facts %}<option value="{{ f.id }}">{{ f.title }}</option>{% endfor %}</select>
+    <label for="c-st">Afirmación</label><input id="c-st" name="statement" placeholder="p. ej. La renta exigida era de 2.650 €" required>
+    <label for="c-sp">Quién lo dijo</label><input id="c-sp" name="speaker" required>
+    <label for="c-q">Cita textual</label><textarea id="c-q" name="quote" rows="3" placeholder="Debe aparecer literalmente en el texto" required></textarea>
+    <label for="c-v">Valor comparable (opcional)</label><input id="c-v" name="value" placeholder="p. ej. 2650 €">
+    <button>Guardar afirmación</button></form>
+   {% else %}<p>Antes de registrar una afirmación necesitas un hecho al que asociarla.</p><p><a class="btn" href="/#nuevo-hecho">Crear un hecho</a></p>{% endif %}
+  </section>
+ </aside>
+</div>
 {% endblock %}

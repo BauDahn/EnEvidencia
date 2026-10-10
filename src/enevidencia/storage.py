@@ -4,8 +4,9 @@ from __future__ import annotations
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from .models import Claim, ClaimRecord, Fact, Source, SourceType
+from .models import Claim, ClaimRecord, Fact, Source, SourceType, Status
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS facts (
@@ -14,13 +15,32 @@ CREATE TABLE IF NOT EXISTS facts (
 CREATE TABLE IF NOT EXISTS sources (
     id INTEGER PRIMARY KEY, url TEXT NOT NULL, text TEXT NOT NULL, source_type TEXT NOT NULL,
     outlet TEXT, author TEXT, published TEXT, title TEXT, kind TEXT,
-    classification_reason TEXT, retrieved_at TEXT NOT NULL
+    classification_reason TEXT, retrieved_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'accepted'
 );
 CREATE TABLE IF NOT EXISTS claims (
     id INTEGER PRIMARY KEY, statement TEXT NOT NULL, speaker TEXT NOT NULL, quote TEXT NOT NULL,
     value TEXT NOT NULL DEFAULT '',
     source_id INTEGER NOT NULL REFERENCES sources(id),
-    fact_id INTEGER NOT NULL REFERENCES facts(id)
+    fact_id INTEGER NOT NULL REFERENCES facts(id),
+    status TEXT NOT NULL DEFAULT 'accepted'
+);
+CREATE TABLE IF NOT EXISTS fact_sources (
+    fact_id INTEGER NOT NULL, source_id INTEGER NOT NULL,
+    extracted INTEGER NOT NULL DEFAULT 0, discarded INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (fact_id, source_id)
+);
+-- Auditoría del flujo automático (tablas nuevas; CREATE IF NOT EXISTS no toca bases existentes)
+CREATE TABLE IF NOT EXISTS audit_queries (
+    id INTEGER PRIMARY KEY, fact_id INTEGER NOT NULL, query TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS audit_sources (
+    id INTEGER PRIMARY KEY, fact_id INTEGER NOT NULL, url TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
+    domain TEXT NOT NULL DEFAULT '', decision TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', source_id INTEGER
+);
+CREATE TABLE IF NOT EXISTS audit_claims (
+    id INTEGER PRIMARY KEY, fact_id INTEGER NOT NULL, source_id INTEGER, url TEXT NOT NULL DEFAULT '',
+    statement TEXT NOT NULL DEFAULT '', speaker TEXT NOT NULL DEFAULT '', quote TEXT NOT NULL DEFAULT '',
+    reason TEXT NOT NULL DEFAULT ''
 );
 """
 
@@ -32,6 +52,15 @@ class Storage:
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Añade la columna status a bases de datos de la v0.1."""
+        for table in ("sources", "claims"):
+            cols = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+            if "status" not in cols:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN status TEXT NOT NULL DEFAULT 'accepted'")
+        self.conn.commit()
 
     # --- hechos
     def add_fact(self, fact: Fact) -> Fact:
@@ -50,11 +79,11 @@ class Storage:
     # --- fuentes
     def add_source(self, s: Source) -> Source:
         cur = self.conn.execute(
-            "INSERT INTO sources(url,text,source_type,outlet,author,published,title,kind,classification_reason,retrieved_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO sources(url,text,source_type,outlet,author,published,title,kind,classification_reason,retrieved_at,status)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (s.url, s.text, s.source_type.value, s.outlet, s.author,
              s.published.isoformat() if s.published else None, s.title, s.kind,
-             s.classification_reason, s.retrieved_at.isoformat()),
+             s.classification_reason, s.retrieved_at.isoformat(), s.status.value),
         )
         self.conn.commit()
         s.id = cur.lastrowid
@@ -66,15 +95,22 @@ class Storage:
             url=r["url"], text=r["text"], source_type=SourceType(r["source_type"]), outlet=r["outlet"] or "",
             author=r["author"] or "", published=date.fromisoformat(r["published"]) if r["published"] else None,
             title=r["title"] or "", kind=r["kind"] or "", classification_reason=r["classification_reason"] or "",
-            retrieved_at=datetime.fromisoformat(r["retrieved_at"]), id=r["id"],
+            retrieved_at=datetime.fromisoformat(r["retrieved_at"]), status=Status(r["status"]), id=r["id"],
         )
 
     def get_source(self, source_id: int) -> Source | None:
         r = self.conn.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
         return self._source(r) if r else None
 
-    def list_sources(self) -> list[Source]:
-        return [self._source(r) for r in self.conn.execute("SELECT * FROM sources ORDER BY id")]
+    def list_sources(self, status: Status | None = None) -> list[Source]:
+        """Todas las fuentes, o solo las de un estado de revisión."""
+        q, args = ("SELECT * FROM sources WHERE status=? ORDER BY id", (status.value,)) if status \
+            else ("SELECT * FROM sources ORDER BY id", ())
+        return [self._source(r) for r in self.conn.execute(q, args)]
+
+    def set_source_status(self, source_id: int, status: Status) -> None:
+        self.conn.execute("UPDATE sources SET status=? WHERE id=?", (status.value, source_id))
+        self.conn.commit()
 
     def set_source_type(self, source_id: int, source_type: SourceType, reason: str = "Corregido manualmente") -> None:
         self.conn.execute("UPDATE sources SET source_type=?, classification_reason=? WHERE id=?",
@@ -84,16 +120,71 @@ class Storage:
     # --- afirmaciones
     def add_claim(self, c: Claim) -> Claim:
         cur = self.conn.execute(
-            "INSERT INTO claims(statement,speaker,quote,value,source_id,fact_id) VALUES (?,?,?,?,?,?)",
-            (c.statement, c.speaker, c.quote, c.value, c.source_id, c.fact_id),
+            "INSERT INTO claims(statement,speaker,quote,value,source_id,fact_id,status) VALUES (?,?,?,?,?,?,?)",
+            (c.statement, c.speaker, c.quote, c.value, c.source_id, c.fact_id, c.status.value),
         )
         self.conn.commit()
         c.id = cur.lastrowid
         return c
 
-    def claims_for_fact(self, fact_id: int) -> list[ClaimRecord]:
+    def set_claim_status(self, claim_id: int, status: Status) -> None:
+        self.conn.execute("UPDATE claims SET status=? WHERE id=?", (status.value, claim_id))
+        self.conn.commit()
+
+    def claims_for_fact(self, fact_id: int, status: Status | None = Status.ACCEPTED) -> list[ClaimRecord]:
+        """Por defecto solo afirmaciones aceptadas (las que entran en comparación e informe). status=None → todas."""
+        q, args = ("SELECT * FROM claims WHERE fact_id=? AND status=? ORDER BY id", (fact_id, status.value)) if status \
+            else ("SELECT * FROM claims WHERE fact_id=? ORDER BY id", (fact_id,))
         out = []
-        for r in self.conn.execute("SELECT * FROM claims WHERE fact_id=? ORDER BY id", (fact_id,)):
-            claim = Claim(r["statement"], r["speaker"], r["quote"], r["source_id"], r["fact_id"], r["value"], r["id"])
+        for r in self.conn.execute(q, args):
+            claim = Claim(r["statement"], r["speaker"], r["quote"], r["source_id"], r["fact_id"], r["value"],
+                          Status(r["status"]), r["id"])
             out.append(ClaimRecord(claim, self.get_source(r["source_id"])))
         return out
+
+    # --- auditoría del flujo automático
+    def add_audit_query(self, fact_id: int, query: str) -> None:
+        self.conn.execute("INSERT INTO audit_queries(fact_id, query) VALUES (?,?)", (fact_id, query))
+        self.conn.commit()
+
+    def add_audit_source(self, fact_id: int, url: str, title: str, domain: str, decision: str, reason: str,
+                         source_id: int | None = None) -> None:
+        """decision: 'accepted' | 'excluded'."""
+        self.conn.execute("INSERT INTO audit_sources(fact_id,url,title,domain,decision,reason,source_id) VALUES (?,?,?,?,?,?,?)",
+                          (fact_id, url, title, domain, decision, reason, source_id))
+        self.conn.commit()
+
+    def add_audit_claim(self, fact_id: int, source_id: int | None, url: str, d: dict) -> None:
+        self.conn.execute("INSERT INTO audit_claims(fact_id,source_id,url,statement,speaker,quote,reason) VALUES (?,?,?,?,?,?,?)",
+                          (fact_id, source_id, url, str(d.get("statement", "")), str(d.get("speaker", "")),
+                           str(d.get("quote", "")), str(d.get("reason", ""))))
+        self.conn.commit()
+
+    def audit(self, fact_id: int) -> dict:
+        """Datos de auditoría: consultas, fuentes encontradas (con estado actual), afirmaciones descartadas."""
+        q = [r["query"] for r in self.conn.execute("SELECT query FROM audit_queries WHERE fact_id=? ORDER BY id", (fact_id,))]
+        srcs = [dict(r) for r in self.conn.execute(
+            "SELECT a.*, s.status AS current_status, s.source_type AS current_type FROM audit_sources a "
+            "LEFT JOIN sources s ON s.id=a.source_id WHERE a.fact_id=? ORDER BY a.id", (fact_id,))]
+        claims = [dict(r) for r in self.conn.execute("SELECT * FROM audit_claims WHERE fact_id=? ORDER BY id", (fact_id,))]
+        return {"queries": q, "sources": srcs, "discarded_claims": claims}
+
+    def methodology(self, fact_id: int) -> dict:
+        """Resumen para el informe y la auditoría. Los recuentos de aceptadas reflejan el estado ACTUAL
+        (si el usuario corrigió algo después, se ve aquí)."""
+        a = self.audit(fact_id)
+        rows = self.conn.execute(
+            "SELECT s.* FROM fact_sources f JOIN sources s ON s.id=f.source_id WHERE f.fact_id=? AND s.status=?",
+            (fact_id, Status.ACCEPTED.value)).fetchall()
+        by_type: dict[str, int] = {}
+        by_domain: dict[str, int] = {}
+        for r in rows:
+            by_type[SourceType(r["source_type"]).label] = by_type.get(SourceType(r["source_type"]).label, 0) + 1
+            host = urlsplit(r["url"]).netloc.lower()
+            host = host[4:] if host.startswith("www.") else host
+            by_domain[host] = by_domain.get(host, 0) + 1
+        considered = len(a["sources"])
+        accepted = len(rows)
+        return {"queries": a["queries"], "considered": considered, "accepted": accepted,
+                "excluded": max(considered - accepted, 0) if considered else 0,
+                "by_type": by_type, "by_domain": by_domain, "automatic": bool(a["queries"] or considered)}

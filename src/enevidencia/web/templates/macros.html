@@ -1,0 +1,46 @@
+{# Macros reutilizables. Neutralidad: todas las etiquetas de tipo y de estado comparten estilo. #}
+{% macro tipo(src) %}<span class="label" title="Clasificación descriptiva, no es un juicio de fiabilidad">{{ src.source_type.label }}</span>{% endmacro %}
+
+{% macro estado_fuente(st) %}<span class="label label-soft">{{ {"proposed":"propuesta","accepted":"aceptada","rejected":"descartada"}[st] }}</span>{% endmacro %}
+
+{% macro sello(status, total) %}
+{% set cls = "is-differ" if status == "se contradicen" else ("is-none" if status == "sin valor comparable" else "") %}
+<div class="stamp {{ cls }}" role="status"><span class="sr-only">Estado entre fuentes: </span>{{ status }}
+ <small>{{ total }} {{ "afirmación" if total == 1 else "afirmaciones" }} aceptada{{ "" if total == 1 else "s" }}. Descripción, no veredicto.</small></div>
+{% endmacro %}
+
+{% macro aviso(titulo="") %}<p class="dossier-note">Este portal muestra lo que dice cada fuente. No decide qué es verdad: la clasificación de fuentes es descriptiva, no un juicio de fiabilidad.</p>{% endmacro %}
+
+{% macro error(msg) %}{% if msg %}<div class="notice" role="alert"><strong class="k">Aviso</strong><p>{{ msg }}</p></div>{% endif %}{% endmacro %}
+
+{# Cita atribuida: «cita», según X, medio, fecha; pie con tipo de fuente y enlace #}
+{% macro cita(r, literal=none) %}
+<figure class="quote" style="margin-left:0;margin-right:0">
+ <p class="claim"><strong>{{ r.claim.speaker }}</strong>: {{ r.claim.statement }}</p>
+ {% if literal is not none %}<p class="literal">Valor literal: <code>{{ literal or "(sin valor)" }}</code></p>{% endif %}
+ <blockquote>«{{ r.claim.quote }}»</blockquote>
+ <footer>
+  <span>Según <cite>{{ r.claim.speaker }}</cite>, <a href="/sources/{{ r.source.id }}">{{ r.source.outlet or r.source.title or "fuente" }}</a>, {{ r.source.published|fecha }}</span>
+  <span>{{ tipo(r.source) }} <span class="label label-soft">fuente nº {{ r.source.id }}</span></span>
+  <a class="url" href="{{ r.source.url|safe_href }}" rel="noopener noreferrer">{{ r.source.url }}</a>
+ </footer>
+</figure>
+{% endmacro %}
+
+{% macro pestanas(fact, activa) %}
+<nav class="tabs" aria-label="Secciones del dossier"><ul>
+ <li><a href="/facts/{{ fact.id }}" {% if activa == "dossier" %}aria-current="page"{% endif %}>Dossier</a></li>
+ <li><a href="/facts/{{ fact.id }}/report.html" {% if activa == "informe" %}aria-current="page"{% endif %}>Informe</a></li>
+ <li><a href="/facts/{{ fact.id }}/audit" {% if activa == "auditoria" %}aria-current="page"{% endif %}>Auditoría</a></li>
+ <li><a href="/facts/{{ fact.id }}/review" {% if activa == "revision" %}aria-current="page"{% endif %}>Revisión</a></li>
+</ul></nav>
+{% endmacro %}
+
+{% macro cabecera_dossier(fact, activa, kicker="Dossier") %}
+<div class="dossier-head">
+ <p class="kicker">{{ kicker }}</p>
+ <h1>{{ fact.title }}</h1>
+ {% if fact.description %}<p class="dek">{{ fact.description }}</p>{% endif %}
+ {{ aviso() }}
+</div>
+{% endmacro %}

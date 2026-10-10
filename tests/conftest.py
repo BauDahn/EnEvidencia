@@ -15,3 +15,11 @@ def db():
 @pytest.fixture
 def fact(db):
     return db.add_fact(Fact("Renta del contrato"))
+
+
+@pytest.fixture(autouse=True)
+def _dns_publico(monkeypatch):
+    """Los tests no usan red: todo host se resuelve a una IP pública salvo que el test lo cambie."""
+    import enevidencia.ingestion as ing
+
+    monkeypatch.setattr(ing, "_resolve", lambda host: ["93.184.216.34"])

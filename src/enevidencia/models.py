@@ -19,6 +19,14 @@ class SourceType(str, Enum):
         return {"primary": "Primaria", "secondary": "Secundaria", "institutional": "Institucional"}[self.value]
 
 
+class Status(str, Enum):
+    """Estado de revisión. Lo propuesto automáticamente no es definitivo hasta que el usuario lo acepta."""
+
+    PROPOSED = "proposed"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
 def normalize_text(text: str) -> str:
     """Colapsa espacios y unifica comillas para comparar citas con el original."""
     text = text.translate(str.maketrans({"“": '"', "”": '"', "«": '"', "»": '"', "‘": "'", "’": "'"}))
@@ -48,6 +56,7 @@ class Source:
     kind: str = ""            # entrevista, sentencia, noticia...
     classification_reason: str = ""
     retrieved_at: datetime = field(default_factory=datetime.now)
+    status: Status = Status.ACCEPTED
     id: int | None = None
 
 
@@ -61,6 +70,7 @@ class Claim:
     source_id: int
     fact_id: int
     value: str = ""           # valor comparable opcional ("2650 €")
+    status: Status = Status.ACCEPTED
     id: int | None = None
 
     def __post_init__(self) -> None:

@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% from "macros.html" import pestanas, cabecera_dossier %}
+{% block title %}Auditoría: {{ fact.title }} · EnEvidencia{% endblock %}
+{% block content %}
+{{ cabecera_dossier(fact, "auditoria", "Auditoría: cómo se hizo este dossier") }}
+{{ pestanas(fact, "auditoria") }}
+<div class="notice"><strong class="k">Cómo se decidió qué entra</strong>
+ <p>El código aplica filtros objetivos (longitud, términos del tema, duplicados, límites por dominio y total;
+ ver <code>config/pipeline.yaml</code>). Ninguno mide fiabilidad, postura u orientación. Aquí aparece todo lo encontrado, también lo excluido.
+ El buscador y la IA pueden introducir sesgos residuales; por eso se muestran las consultas y los motivos.</p></div>
+<p class="no-print"><a href="/facts/{{ fact.id }}">Volver al hecho</a> · <a href="/facts/{{ fact.id }}/review">Corregir a mano (opcional)</a></p>
+
+<div class="section-label">Consultas usadas</div>
+{% if audit.queries %}<ol class="queries">{% for q in audit.queries %}<li>{{ q }}</li>{% endfor %}</ol>
+{% else %}<div class="empty"><p>No hay consultas registradas (hecho creado a mano).</p></div>{% endif %}
+
+<div class="section-label">Recuento</div>
+<div class="counts"><div><b>{{ m.considered }}</b><span>consideradas</span></div><div><b>{{ m.accepted }}</b><span>aceptadas</span></div><div><b>{{ m.excluded }}</b><span>excluidas</span></div></div>
+<p class="meta">Consideradas: {{ m.considered }} · aceptadas: {{ m.accepted }} · excluidas: {{ m.excluded }}.</p>
+<p>Aceptadas por tipo: {% for k, v in m.by_type.items() %}{{ k }}: {{ v }}{% if not loop.last %} · {% endif %}{% else %}ninguna{% endfor %}</p>
+<p>Aceptadas por medio/dominio: {% for k, v in m.by_domain.items() %}{{ k }}: {{ v }}{% if not loop.last %} · {% endif %}{% else %}ninguna{% endfor %}</p>
+
+<div class="section-label">Fuentes encontradas <span>{{ audit.sources|length }}</span></div>
+{% for s in audit.sources %}<article class="entry"><h3>{{ s.title or s.url }}</h3>
+ <p class="meta"><span class="label">{{ "aceptada" if s.decision == "accepted" else "excluida" }}</span>
+ {% if s.current_status and s.current_status != ("accepted" if s.decision == "accepted" else "rejected") %}<span class="label label-soft">estado actual tras corrección: {{ {"proposed":"propuesta","accepted":"aceptada","rejected":"descartada"}[s.current_status] }}</span>{% endif %}
+ {{ s.domain }} · <a href="{{ s.url|safe_href }}" rel="noopener noreferrer">{{ s.url }}</a></p>
+ <p class="why"><b>Motivo</b><br>{{ s.reason }}</p></article>
+{% else %}<div class="empty"><p>Sin fuentes registradas.</p></div>{% endfor %}
+
+<div class="section-label">Afirmaciones descartadas por la verificación <span>{{ audit.discarded_claims|length }}</span></div>
+{% for c in audit.discarded_claims %}<article class="entry"><h3>{{ c.speaker or "(sin autor)" }}: {{ c.statement }}</h3>
+ <blockquote class="quote" style="margin-left:0">«{{ c.quote }}»</blockquote>
+ <p class="meta">{{ c.url }}</p><p class="why"><b>Motivo</b><br>{{ c.reason }}</p></article>
+{% else %}<div class="empty"><p>Ninguna.</p></div>{% endfor %}
+{% endblock %}

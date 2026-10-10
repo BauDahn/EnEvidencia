@@ -1,19 +1,40 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>{% block title %}EnEvidencia{% endblock %}</title>
-<style>
- body{font-family:system-ui,sans-serif;max-width:60rem;margin:0 auto;padding:1rem;line-height:1.5;color:#222}
- header{border-bottom:1px solid #ddd;margin-bottom:1rem}
- .note{background:#f4f4f0;padding:.6rem 1rem;border-left:4px solid #888;font-size:.9rem}
- .group{border:1px solid #ccc;border-radius:6px;padding:.5rem 1rem;margin:1rem 0}
- .tag{font-size:.75rem;background:#e8e8e8;padding:.1rem .5rem;border-radius:10px}
- blockquote{margin:.3rem 0 .8rem;padding-left:.8rem;border-left:3px solid #bbb;color:#444}
- .err{background:#fde8e8;padding:.5rem 1rem;border-left:4px solid #c00}
- input,textarea,select{width:100%;box-sizing:border-box;margin:.2rem 0 .6rem;padding:.4rem;font:inherit}
- pre{white-space:pre-wrap}
- @media (prefers-color-scheme:dark){body{background:#181818;color:#ddd}.note{background:#2a2a28}.group{border-color:#444}.tag{background:#333}blockquote{color:#aaa}input,textarea,select{background:#222;color:#ddd}a{color:#8ab4f8}}
-</style></head><body>
-<header><h1><a href="/" style="text-decoration:none;color:inherit">EnEvidencia</a></h1>
-<p class="note">Este portal muestra lo que dice cada fuente. No decide qué es verdad; la clasificación de fuentes es descriptiva, no un juicio de fiabilidad.</p></header>
+<link rel="stylesheet" href="/static/portal.css">
+{% block head %}{% endblock %}
+</head><body>
+<a class="skip" href="#contenido">Saltar al contenido</a>
+<header class="wrap" role="banner">
+ <div class="topline"><span>{{ hoy() }}</span><span>Edición local · Datos en tu equipo</span></div>
+ <div class="masthead">
+  <p class="title"><a href="/">EnEvidencia</a></p>
+  <p class="motto">“The truth is rarely pure and never simple.” <span class="motto-author">— Oscar Wilde</span></p>
+ </div>
+ <hr class="rules">
+ <nav class="sections" aria-label="Secciones del portal"><ul>
+  <li><a href="/" {% if section == "hechos" %}aria-current="page"{% endif %}>Hechos</a></li>
+  <li><a href="/#fuentes" {% if section == "fuentes" %}aria-current="page"{% endif %}>Fuentes</a></li>
+  <li><a href="/#investigar">Investigar</a></li>
+  <li><a href="#metodologia">Metodología</a></li>
+ </ul></nav>
+ <p class="editorial-note"><strong>Nota editorial.</strong> Este portal muestra lo que dice cada fuente. No decide qué es verdad; la clasificación de fuentes es descriptiva, no un juicio de fiabilidad.</p>
+</header>
+<main id="contenido" class="wrap" tabindex="-1">
 {% block content %}{% endblock %}
+</main>
+<footer class="wrap site-footer" id="metodologia">
+ <div class="cols">
+  <section aria-labelledby="f-met"><h2 id="f-met">Metodología</h2>
+   <p>La IA propone consultas, clasifica y extrae afirmaciones; el código verifica con criterios objetivos y documentados (<code>config/pipeline.yaml</code>) que cada cita aparece literalmente en la fuente. Todo lo encontrado, también lo excluido, queda en la auditoría de cada dossier y puede corregirse a mano.</p>
+   <p>El buscador y la IA pueden introducir sesgos residuales; por eso se muestran las consultas y los motivos.</p></section>
+  <section aria-labelledby="f-pri"><h2 id="f-pri">Principios</h2>
+   <p>Sin veredictos: se muestran coincidencias y contradicciones entre lo que dicen las fuentes, nunca cuál tiene razón. Primaria, secundaria e institucional son etiquetas descriptivas, no una escala de fiabilidad. Cada afirmación lleva su fuente, su autor y su cita textual.</p></section>
+  <section aria-labelledby="f-lic"><h2 id="f-lic">Licencia y código</h2>
+   <p>Software libre bajo licencia MIT.</p>
+   <p><a href="https://github.com/BauDahn/EnEvidencia" rel="noopener noreferrer">Repositorio en GitHub</a></p></section>
+ </div>
+ <div class="colophon"><span>EnEvidencia · {{ hoy() }}</span><span>Este portal no decide la verdad.</span></div>
+</footer>
 </body></html>

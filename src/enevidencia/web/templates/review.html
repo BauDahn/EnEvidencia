@@ -1,0 +1,47 @@
+{% extends "base.html" %}{% from "macros.html" import pestanas, cabecera_dossier, tipo, estado_fuente, error as aviso_error %}
+{% block title %}Revisión: {{ fact.title }} · EnEvidencia{% endblock %}
+{% block content %}
+{{ cabecera_dossier(fact, "revision", "Revisión editorial manual") }}
+{{ pestanas(fact, "revision") }}
+{{ aviso_error(error) }}
+<div class="notice"><strong class="k">Cómo funciona</strong><p>Nada de lo propuesto cuenta hasta que lo aceptes. Solo lo aceptado entra en la comparación y el informe.</p></div>
+<p><a href="/facts/{{ fact.id }}">Ver comparación</a></p>
+<div class="counts" style="grid-template-columns:repeat(2,1fr)">
+ <div><span>Fuentes</span><p class="meta" style="margin:.3rem 0 0">{{ stats.src_proposed }} propuestas · {{ stats.src_accepted }} aceptadas · {{ stats.src_rejected }} descartadas</p></div>
+ <div><span>Afirmaciones</span><p class="meta" style="margin:.3rem 0 0">{{ stats.cl_proposed }} propuestas · {{ stats.cl_accepted }} aceptadas · {{ stats.cl_rejected }} descartadas</p></div>
+</div>
+<p class="meta">La verificación de cita descartó automáticamente <strong>{{ stats.discarded }}</strong> afirmaciones (la cita no aparecía literalmente en la fuente).</p>
+{% if stats.pending_extraction %}<form method="post" action="/facts/{{ fact.id }}/extract">
+ <button>Extraer afirmaciones de {{ stats.pending_extraction }} fuente(s) aceptada(s)</button></form>{% endif %}
+{% set back = "/facts/%d/review" % fact.id %}
+<div class="section-label">Fuentes y afirmaciones</div>
+{% for s in sources %}{% set l = links[s.id] %}
+<article class="entry"><h3>{{ s.title or s.url }} {{ estado_fuente(s.status.value) }}</h3>
+ <p class="meta"><a href="{{ s.url|safe_href }}" rel="noopener noreferrer">{{ s.url }}</a><br>Medio: {{ s.outlet or "desconocido" }} · {{ s.published or "fecha desconocida" }}</p>
+ <p class="meta">Tipo: {{ tipo(s) }} {{ s.classification_reason }}</p>
+ <details><summary>Extracto</summary><pre>{{ s.text[:600] }}{% if s.text|length > 600 %}…{% endif %}</pre></details>
+ <div class="row-form">
+ <form method="post" action="/sources/{{ s.id }}/status" class="inline-form">
+  <input type="hidden" name="next" value="{{ back }}">
+  {% if s.status != Status.ACCEPTED %}<button class="small" name="status" value="accepted">Aceptar</button>{% endif %}
+  {% if s.status != Status.REJECTED %}<button class="small secondary" name="status" value="rejected">Descartar</button>{% endif %}</form>
+ <form method="post" action="/sources/{{ s.id }}/type" class="row-form"><input type="hidden" name="next" value="{{ back }}">
+  <label class="sr-only" for="t{{ s.id }}">Tipo de fuente</label>
+  <select id="t{{ s.id }}" name="source_type">{% for t in types %}<option value="{{ t.value }}" {{ "selected" if t == s.source_type }}>{{ t.label }}</option>{% endfor %}</select>
+  <button class="small secondary">Corregir tipo</button></form></div>
+ {% if s.status == Status.ACCEPTED %}
+  {% if l.error %}{{ aviso_error("Extracción incompleta: " ~ l.error) }}{% endif %}
+  {% if not l.extracted %}<p><em>Pendiente de extraer afirmaciones.</em></p>{% endif %}
+  {% for c in by_source.get(s.id, []) if c.status != Status.REJECTED %}
+   <figure class="quote" style="margin-left:0;margin-right:0"><p class="claim"><strong>{{ c.speaker }}</strong>: {{ c.statement }}
+    <span class="label label-soft">{{ {"proposed":"propuesta","accepted":"aceptada"}[c.status.value] }}</span></p>
+    {% if c.value %}<p class="literal">Valor literal: <code>{{ c.value }}</code></p>{% endif %}
+    <blockquote>«{{ c.quote }}»</blockquote>
+    <form method="post" action="/claims/{{ c.id }}/status" class="row-form"><input type="hidden" name="next" value="{{ back }}">
+     {% if c.status != Status.ACCEPTED %}<button class="small" name="status" value="accepted">Aceptar</button>{% endif %}
+     <button class="small secondary" name="status" value="rejected">Descartar</button></form></figure>
+  {% endfor %}
+ {% endif %}</article>
+{% else %}<div class="empty"><h3>No hay fuentes para revisar</h3><p>Cuando una investigación encuentre fuentes, o añadas alguna a mano, podrás aceptarlas o descartarlas aquí.</p>
+ <p><a class="btn" href="/#investigar">Investigar un tema</a></p></div>{% endfor %}
+{% endblock %}

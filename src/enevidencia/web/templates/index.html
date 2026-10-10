@@ -1,15 +1,98 @@
-{% extends "base.html" %}{% block content %}
-<h2>Hechos</h2>
-<ul>{% for f in facts %}<li><a href="/facts/{{ f.id }}">{{ f.title }}</a></li>{% else %}<li>Aún no hay hechos.</li>{% endfor %}</ul>
-<form method="post" action="/facts"><h3>Nuevo hecho</h3>
- <input name="title" placeholder="Título (p. ej. Renta exigida en el contrato)" required>
- <textarea name="description" placeholder="Descripción (opcional)"></textarea><button>Crear</button></form>
-<h2>Fuentes</h2>
-<ul>{% for s in sources %}<li><a href="/sources/{{ s.id }}">{{ s.title or s.url }}</a> <span class="tag">{{ s.source_type.label }}</span></li>{% else %}<li>Aún no hay fuentes.</li>{% endfor %}</ul>
-<form method="post" action="/sources"><h3>Añadir fuente</h3>
- <input name="url" placeholder="URL" required>
- <textarea name="text" rows="6" placeholder="Texto original (si lo dejas vacío, se descarga de la URL)"></textarea>
- <input name="kind" placeholder="Tipo de documento: entrevista, sentencia, comunicado, noticia…">
- <input name="outlet" placeholder="Medio o institución"><input name="author" placeholder="Autor">
- <input name="title" placeholder="Título"><input name="published" type="date"><button>Guardar fuente</button></form>
+{% extends "base.html" %}{% from "macros.html" import tipo, estado_fuente, error as aviso_error %}
+{% set section = "hechos" %}
+{% block content %}
+{{ aviso_error(error) }}
+{% macro meta(c) %}<p class="meta">{{ c.sources }} fuente{{ "" if c.sources == 1 else "s" }} · {{ c.claims }} {{ "afirmación" if c.claims == 1 else "afirmaciones" }}
+ {% if c.status %}· entre fuentes: <strong>{{ c.status }}</strong>{% endif %}{% if c.latest %} · fuente más reciente: {{ c.latest|fecha }}{% endif %}</p>{% endmacro %}
+<div class="front">
+ <div class="main">
+  {% if cards %}
+  {% set lead = cards[0] %}
+  <article class="lead-story" aria-labelledby="apertura">
+   <p class="kicker">Apertura · Hecho destacado</p>
+   <h2 id="apertura"><a href="/facts/{{ lead.fact.id }}">{{ lead.fact.title }}</a></h2>
+   {% if lead.fact.description %}<p class="dek lead">{{ lead.fact.description }}</p>
+   {% else %}<p class="dek lead">Dossier con las afirmaciones de cada fuente, citadas literalmente y comparadas valor a valor. No emitimos veredictos.</p>{% endif %}
+   {{ meta(lead) }}
+   <p style="margin-top:1rem"><a class="btn" href="/facts/{{ lead.fact.id }}">Leer el dossier</a>
+    <a class="btn secondary" href="/facts/{{ lead.fact.id }}/audit">Auditoría</a></p>
+  </article>
+  {% if cards|length > 1 %}
+  <div class="section-label">Más hechos <span>{{ cards|length - 1 }} dossier{{ "" if cards|length == 2 else "s" }}</span></div>
+  <div class="stories">
+   {% for c in cards[1:] %}
+   <article class="story">
+    <p class="kicker">Dossier nº {{ c.fact.id }}</p>
+    <h3><a href="/facts/{{ c.fact.id }}">{{ c.fact.title }}</a></h3>
+    {% if c.fact.description %}<p class="dek">{{ c.fact.description }}</p>{% endif %}
+    {{ meta(c) }}
+   </article>{% endfor %}
+  </div>{% endif %}
+  {% else %}
+  <section class="empty" aria-labelledby="vacio">
+   <p class="kicker">Portada sin noticias</p>
+   <h2 id="vacio">La primera edición está por escribirse</h2>
+   <p class="lead">Todavía no hay ningún hecho investigado. Elige un tema concreto, por ejemplo la renta exigida en un contrato o una cifra discutida, y el portal reunirá lo que dice cada fuente, con su cita literal y su enlace, para que las compares tú.</p>
+   <p><a class="btn" href="#investigar">Investigar un tema</a> <a class="btn secondary" href="#nuevo-hecho">Crear un hecho a mano</a></p>
+  </section>
+  {% endif %}
+
+  <div class="section-label" id="fuentes">Fuentes <span>{{ sources|length }} en el archivo</span></div>
+  {% if sources %}
+  <ul class="src-list">{% for s in sources|reverse %}
+   <li><a href="/sources/{{ s.id }}">{{ s.title or s.url }}</a> {{ tipo(s) }}
+    {% if s.status.value != "accepted" %}{{ estado_fuente(s.status.value) }}{% endif %}
+    <br><span class="meta">{{ s.outlet or "medio desconocido" }} · {{ s.published|fecha }}</span></li>{% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty"><h3>El archivo de fuentes está vacío</h3>
+   <p>Las fuentes llegan solas cuando investigas un tema, o puedes añadir una a mano pegando su URL (y, si quieres, el texto original) en el formulario siguiente.</p></div>
+  {% endif %}
+
+  <section aria-labelledby="add-src" style="margin-top:2rem">
+   <div class="section-label" id="add-src">Añadir fuente <span>modo manual</span></div>
+   <form method="post" action="/sources" class="form-grid">
+    <div class="wide"><label for="s-url">URL</label><input id="s-url" name="url" placeholder="http/https; también PDF con texto" required></div>
+    <div class="wide"><label for="s-text">Texto original</label><textarea id="s-text" name="text" rows="6" placeholder="Si lo dejas vacío, se descarga de la URL"></textarea></div>
+    <div><label for="s-kind">Tipo de documento</label><input id="s-kind" name="kind" placeholder="entrevista, sentencia, comunicado, noticia…"></div>
+    <div><label for="s-outlet">Medio o institución</label><input id="s-outlet" name="outlet"></div>
+    <div><label for="s-author">Autor</label><input id="s-author" name="author"></div>
+    <div><label for="s-title">Título</label><input id="s-title" name="title"></div>
+    <div><label for="s-pub">Fecha de publicación</label><input id="s-pub" name="published" type="date"></div>
+    <div class="wide"><button>Guardar fuente</button></div>
+   </form>
+  </section>
+ </div>
+
+ <aside aria-label="Barra lateral">
+  <section class="card-box" id="investigar" aria-labelledby="inv-t">
+   <p class="kicker">Servicio al lector</p>
+   <h2 id="inv-t">Investigar un tema</h2>
+   <form method="post" action="/investigate">
+    <label for="topic">Tema o hecho concreto</label>
+    <input id="topic" name="topic" placeholder="p. ej. Renta exigida en el contrato de alquiler X" required>
+    <button>Investigar</button>
+   </form>
+   <p class="aside-note" style="margin-top:.9rem">Proceso automático de principio a fin: la IA propone consultas y afirmaciones; el código filtra las fuentes con criterios objetivos (config/pipeline.yaml) y verifica cada cita. No tienes que aceptar nada (así no se introduce tu sesgo); todo queda en la auditoría y puedes corregirlo después. Los textos se envían a Google (Gemini): consulta el aviso de privacidad del README.</p>
+  </section>
+
+  <section aria-labelledby="ult-t">
+   <div class="section-label" style="margin-top:0">Últimas fuentes añadidas</div>
+   <h2 id="ult-t" class="sr-only">Últimas fuentes añadidas</h2>
+   {% if latest_sources %}
+   <ul class="latest">{% for s in latest_sources %}
+    <li><a href="/sources/{{ s.id }}">{{ s.title or s.url }}</a><span class="meta">{{ s.outlet or "medio desconocido" }} · {{ tipo(s) }}</span></li>{% endfor %}</ul>
+   {% else %}<p class="aside-note">Sin fuentes todavía. Aparecerán aquí en cuanto investigues un tema o añadas una a mano.</p>{% endif %}
+  </section>
+
+  <section class="card-box" id="nuevo-hecho" aria-labelledby="nh-t" style="margin-top:1.6rem">
+   <h3 id="nh-t">Nuevo hecho (modo manual)</h3>
+   <form method="post" action="/facts">
+    <label for="f-title">Título</label><input id="f-title" name="title" placeholder="p. ej. Renta exigida en el contrato" required>
+    <label for="f-desc">Descripción (opcional)</label><textarea id="f-desc" name="description" rows="3"></textarea>
+    <button class="secondary">Crear</button>
+   </form>
+  </section>
+ </aside>
+</div>
 {% endblock %}

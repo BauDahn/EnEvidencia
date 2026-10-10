@@ -1,15 +1,58 @@
-{% extends "base.html" %}{% block title %}{{ fact.title }}{% endblock %}{% block content %}
-<h2>{{ fact.title }}</h2><p>{{ fact.description }}</p>
-<p>Estado entre fuentes: <strong>{{ cmp.status }}</strong> ({{ cmp.total }} afirmaciones) ·
-<a href="/facts/{{ fact.id }}/report.md">Informe .md</a> · <a href="/facts/{{ fact.id }}/report.html">Informe .html</a></p>
-{% macro rec(r) %}<p><strong>{{ r.claim.speaker }}</strong>: {{ r.claim.statement }}
- <span class="tag">{{ r.source.source_type.label }}</span></p>
- <blockquote>«{{ r.claim.quote }}»</blockquote>
- <small><a href="/sources/{{ r.source.id }}">{{ r.source.title or r.source.outlet or "Fuente" }}</a> ·
- {{ r.source.published or "fecha desconocida" }} · <a href="{{ r.source.url }}">{{ r.source.url }}</a></small>{% endmacro %}
-{% for g in cmp.groups %}<div class="group"><h3>Valor: {{ g.value }} <span class="tag">{{ g.records|length }} fuente(s)</span></h3>
- {% for r in g.records %}{{ rec(r) }}{% endfor %}</div>{% endfor %}
-{% if cmp.without_value %}<div class="group"><h3>Sin valor comparable</h3>{% for r in cmp.without_value %}{{ rec(r) }}{% endfor %}</div>{% endif %}
-<p>Para añadir afirmaciones, abre una fuente y marca la cita.</p>
-<ul>{% for s in sources %}<li><a href="/sources/{{ s.id }}">{{ s.title or s.url }}</a></li>{% endfor %}</ul>
+{% extends "base.html" %}{% from "macros.html" import pestanas, cabecera_dossier, sello, cita, error as aviso_error %}
+{% block title %}{{ fact.title }} · EnEvidencia{% endblock %}
+{% macro columnas(c, ai) %}
+ {% set n = c.groups|length + (1 if c.without_value else 0) %}
+ <div class="columns n{{ [n, 4]|min if n > 1 else 1 }}">
+ {% for g in c.groups %}
+  <section class="column" aria-label="Valor {{ g.value }}">
+   <header><h3>{{ g.value if ai else normalize_value(g.value) }}</h3>
+    <p>Valor{% if ai %} propuesto por IA{% else %} normalizado{% endif %} · {{ g.records|length }} fuente{{ "" if g.records|length == 1 else "s" }}</p></header>
+   {% for r in g.records %}{{ cita(r, literal[r.claim.id]) }}{% endfor %}
+  </section>{% endfor %}
+ {% if c.without_value %}
+  <section class="column plain" aria-label="Sin valor comparable">
+   <header><h3>Sin valor comparable</h3><p>{{ c.without_value|length }} {{ "afirmación" if c.without_value|length == 1 else "afirmaciones" }}</p></header>
+   {% for r in c.without_value %}{{ cita(r, literal[r.claim.id]) }}{% endfor %}
+  </section>{% endif %}
+ </div>
+{% endmacro %}
+{% block content %}
+{{ cabecera_dossier(fact, "dossier") }}
+{{ pestanas(fact, "dossier") }}
+{{ aviso_error(error) }}
+
+<div class="stamp-row">
+ {{ sello(cmp.status, cmp.total) }}
+ <div>
+  <p class="stat-line"><strong>Estado entre fuentes</strong>: {{ cmp.status }} ({{ cmp.total }} afirmaciones aceptadas)</p>
+  {% if m.automatic %}<p class="stat-line">Fuentes consideradas: {{ m.considered }} · aceptadas: {{ m.accepted }} · excluidas: {{ m.excluded }}
+   {% if m.by_type %}· por tipo: {% for k, v in m.by_type.items() %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}.
+   Aceptación automática con criterios objetivos: <a href="/facts/{{ fact.id }}/audit">ver auditoría</a>.</p>{% endif %}
+ </div>
+</div>
+
+{% if pending_sources or pending_claims %}<div class="notice"><strong class="k">Pendiente de revisión</strong>
+ <p>Hay {{ pending_sources }} fuente(s) y {{ pending_claims }} afirmación(es) propuestas sin revisar:
+ <a href="/facts/{{ fact.id }}/review">revisar</a>. No cuentan hasta que las aceptes.</p></div>{% endif %}
+
+<p class="no-print"><a class="btn secondary small" href="/facts/{{ fact.id }}/report.md">Informe .md</a>
+ <a class="btn secondary small" href="/facts/{{ fact.id }}/report.html">Informe .html</a>
+ <a class="btn secondary small" href="/facts/{{ fact.id }}/report-ia">Informe con redacción IA</a>
+ {% if sections is none %}<a class="btn secondary small" href="/facts/{{ fact.id }}?grouped=1">Agrupar por punto con IA</a>{% else %}<a class="btn secondary small" href="/facts/{{ fact.id }}">Vista simple</a>{% endif %}</p>
+
+<div class="section-label">La comparación <span>cada columna es un valor; cada recuadro, lo que dice una fuente</span></div>
+{% if cmp.total == 0 and sections is none %}
+ <div class="empty"><h3>Este dossier aún no tiene afirmaciones</h3>
+  <p>Una comparación necesita al menos una afirmación aceptada con su cita literal. Abre una fuente y marca la cita para registrarla a mano, o revisa las propuestas pendientes.</p>
+  <p><a class="btn" href="/facts/{{ fact.id }}/review">Ir a la revisión</a></p></div>
+{% elif sections is none %}{{ columnas(cmp, false) }}
+{% else %}{% for grp, c in sections %}
+ <div class="topic-head"><h2>{{ grp.topic }}</h2><span class="stamp {{ 'is-differ' if c.status == 'se contradicen' else ('is-none' if c.status == 'sin valor comparable' else '') }}" style="font-size:.7rem;padding:.25rem .6rem">{{ c.status }}</span></div>
+ {{ columnas(c, true) }}{% endfor %}
+{% endif %}
+
+<div class="section-label">Fuentes del archivo <span>para añadir afirmaciones a mano, abre una fuente y marca la cita</span></div>
+{% if sources %}<ul class="src-list">{% for s in sources %}<li><a href="/sources/{{ s.id }}">{{ s.title or s.url }}</a></li>{% endfor %}</ul>
+{% else %}<p class="meta">No hay fuentes aceptadas en el archivo.</p>{% endif %}
+<p class="meta" style="margin-top:1rem"><a href="/facts/{{ fact.id }}/review">Corregir a mano fuentes y afirmaciones (opcional)</a></p>
 {% endblock %}

@@ -17,7 +17,7 @@ enevidencia = "enevidencia.web.app:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-enevidencia = ["web/templates/*.html"]
+enevidencia = ["web/templates/*.html", "reporting/templates/*.html", "web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
