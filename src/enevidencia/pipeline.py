@@ -27,6 +27,8 @@ DEFAULTS = {
     "max_total": 12,
     "umbral_duplicado": 0.85,
     "max_candidatas": 30,
+    "max_caracteres_fuente": 120000,
+    "max_trozos_extraccion": 12,
 }
 
 STOPWORDS = set("""a al algo ante con contra cual cuando de del desde donde durante e el ella ellas ello ellos en entre

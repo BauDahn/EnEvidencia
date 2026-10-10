@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% from "comunidad_macros.html" import normas %}{% from "macros.html" import error as aviso_error %}
+{% block title %}Nueva carta · Comunidad · EnEvidencia{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/community.css">{% endblock %}
+{% block content %}
+<div class="com com-narrow">
+ <p class="kicker"><a href="/comunidad">Comunidad</a></p><h1>Escribir una carta</h1>
+ {% if fact %}<p class="meta">Sobre el hecho: <a href="/facts/{{ fact.id }}">{{ fact.title }}</a></p>{% endif %}
+ {{ normas() }}{{ aviso_error(error) }}
+ <form method="post" action="/comunidad" class="com-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% if fact %}<input type="hidden" name="fact_id" value="{{ fact.id }}">{% endif %}
+  <label for="title">Titular (8 a 140 caracteres)</label>
+  <input id="title" name="title" minlength="8" maxlength="140" required value="{{ form.title or '' }}">
+  <label for="category">Sección</label>
+  <select id="category" name="category">{% for c in categories %}<option value="{{ c }}" {% if c == form.category %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+  <label for="body">Texto (5 a 5000 caracteres, texto plano)</label>
+  <textarea id="body" name="body" rows="9" minlength="5" maxlength="5000" required>{{ form.body or '' }}</textarea>
+  <button>Publicar</button> <a class="btn secondary" href="/comunidad">Cancelar</a>
+ </form>
+</div>
+{% endblock %}

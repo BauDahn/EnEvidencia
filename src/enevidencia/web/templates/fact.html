@@ -35,10 +35,7 @@
  <p>Hay {{ pending_sources }} fuente(s) y {{ pending_claims }} afirmación(es) propuestas sin revisar:
  <a href="/facts/{{ fact.id }}/review">revisar</a>. No cuentan hasta que las aceptes.</p></div>{% endif %}
 
-<p class="no-print"><a class="btn secondary small" href="/facts/{{ fact.id }}/report.md">Informe .md</a>
- <a class="btn secondary small" href="/facts/{{ fact.id }}/report.html">Informe .html</a>
- <a class="btn secondary small" href="/facts/{{ fact.id }}/report-ia">Informe con redacción IA</a>
- {% if sections is none %}<a class="btn secondary small" href="/facts/{{ fact.id }}?grouped=1">Agrupar por punto con IA</a>{% else %}<a class="btn secondary small" href="/facts/{{ fact.id }}">Vista simple</a>{% endif %}</p>
+<p class="no-print">{% if sections is none %}<a class="btn secondary small" href="/facts/{{ fact.id }}?grouped=1">Agrupar por punto con IA</a>{% else %}<a class="btn secondary small" href="/facts/{{ fact.id }}">Vista simple</a>{% endif %}</p>
 
 <div class="section-label">La comparación <span>cada columna es un valor; cada recuadro, lo que dice una fuente</span></div>
 {% if cmp.total == 0 and sections is none %}
@@ -51,8 +48,59 @@
  {{ columnas(c, true) }}{% endfor %}
 {% endif %}
 
+
+<section id="informe" aria-labelledby="informe-t">
+<div class="section-label" id="informe-t">Informe <span>resumen redactado con IA a partir de las afirmaciones aceptadas</span></div>
+{% if not report %}
+ <div class="empty"><h3>Este dossier aún no tiene informe redactado</h3>
+  <p>El informe es un resumen narrativo, neutral y atribuido, escrito por una IA solo con las afirmaciones aceptadas de este dossier. Cada frase remite a su fuente con una referencia [n] y el código comprueba que esas referencias existan. No decide qué es verdad. Se redacta una sola vez y queda guardado, porque cada redacción consume cuota del servicio de IA.</p>
+  {% if is_admin and cmp.total %}
+  <form method="post" action="/facts/{{ fact.id }}/report/generate"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Redactar informe con IA</button></form>
+  {% elif is_admin %}<p class="meta">Necesita al menos una afirmación aceptada.</p>
+  {% else %}<p class="meta">Aún no se ha redactado. Solo la administración puede generarlo.</p>{% endif %}
+ </div>
+{% else %}
+ <p class="meta">Redactado el {{ report.created_at.strftime("%d/%m/%Y %H:%M") }}{% if report.model %} con {{ report.model }}{% endif %}
+  a partir de {{ report.accepted_claims_count }} afirmaciones aceptadas.</p>
+ {% if report.outdated %}<div class="notice"><strong class="k">Informe desactualizado</strong>
+  <p>Cuando se redactó había {{ report.accepted_claims_count }} afirmaciones aceptadas y ahora hay {{ report.now_count }}. El texto de abajo puede no reflejar el estado actual.</p>
+  {% if is_admin %}<form method="post" action="/facts/{{ fact.id }}/report/generate"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="secondary">Volver a redactar con IA</button></form>{% endif %}</div>{% endif %}
+ {% if report.error %}
+  <div class="notice" role="alert"><strong class="k">Redacción de IA no incluida</strong>
+   <p>La narrativa generada se rechazó en la validación y no se muestra: {{ report.error }}. La comparación de arriba, con las citas literales, sigue siendo la referencia.</p>
+   {% if is_admin %}<form method="post" action="/facts/{{ fact.id }}/report/generate"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="secondary">Reintentar redacción</button></form>{% endif %}</div>
+ {% else %}
+  <h3 class="kicker">Resumen redactado <span class="label">Asistido por IA, revisar</span></h3>
+  <div class="report-body">
+  {% for b in report.blocks %}
+   {% if b.kind == "h" %}<h4>{{ b.html }}</h4>{% elif b.kind == "ul" %}<ul>{% for i in b["items"] %}<li>{{ i }}</li>{% endfor %}</ul>{% else %}<p>{{ b.html }}</p>{% endif %}
+  {% endfor %}</div>
+  {% if report.warnings %}<div class="notice"><strong class="k">Avisos de la validación</strong>
+   <ul>{% for w in report.warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>{% endif %}
+  <h3>Fuentes citadas</h3>
+  <ol class="refs">{% for r in report.references %}
+   <li id="fn-{{ r.n }}" value="{{ r.n }}">[{{ r.n }}] {{ [r.author, r.outlet, r.title]|select|join(", ") or "Fuente" }}
+    ({{ r.published or "fecha desconocida" }}) · <span class="label">{{ r.type }}</span> ·
+    <a class="url" href="{{ r.url|safe_href }}" rel="noopener noreferrer">{{ r.url }}</a>
+    · <a href="/sources/{{ r.source_id }}">ver en el archivo</a></li>{% endfor %}</ol>
+ {% endif %}
+ {% set rm = report.m %}
+ <h3>Metodología</h3>
+ {% if not rm.automatic %}<p>Las fuentes de este hecho se añadieron manualmente; no hubo búsqueda automática.</p>
+ {% else %}
+  <p>Consultas utilizadas: {% if rm.queries %}{% for q in rm.queries %}«{{ q }}»{% if not loop.last %}; {% endif %}{% endfor %}{% else %}no registradas{% endif %}.</p>
+  <p>Fuentes consideradas: {{ rm.considered }} · aceptadas: {{ rm.accepted }} · excluidas: {{ rm.excluded }}
+   (criterios objetivos en <code>config/pipeline.yaml</code>; motivos en la <a href="/facts/{{ fact.id }}/audit">auditoría</a>).</p>
+  {% if rm.by_type %}<p>Aceptadas por tipo: {% for k, v in rm.by_type|dictsort %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+  {% if rm.by_domain %}<p>Aceptadas por medio/dominio: {% for k, v in rm.by_domain|dictsort %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+  <p class="meta">El buscador y la IA que propone consultas pueden introducir sesgos que el código no elimina; por eso se muestran las consultas y todas las exclusiones. El sistema no decide la verdad.</p>
+ {% endif %}
+{% endif %}
+</section>
+
 <div class="section-label">Fuentes del archivo <span>para añadir afirmaciones a mano, abre una fuente y marca la cita</span></div>
 {% if sources %}<ul class="src-list">{% for s in sources %}<li><a href="/sources/{{ s.id }}">{{ s.title or s.url }}</a></li>{% endfor %}</ul>
 {% else %}<p class="meta">No hay fuentes aceptadas en el archivo.</p>{% endif %}
 <p class="meta" style="margin-top:1rem"><a href="/facts/{{ fact.id }}/review">Corregir a mano fuentes y afirmaciones (opcional)</a></p>
+{% include "comunidad_bloque_hecho.html" %}
 {% endblock %}

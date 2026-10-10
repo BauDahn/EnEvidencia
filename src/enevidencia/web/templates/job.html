@@ -15,7 +15,7 @@
 {% if job.status != "running" %}
 <div class="section-label">Siguientes pasos</div>
 {% if job.kind == "investigar" %}<p><a class="btn" href="/facts/{{ job.fact_id }}">Ver el hecho y la comparación</a>
- <a class="btn secondary" href="/facts/{{ job.fact_id }}/report.md">Informe</a>
+ <a class="btn secondary" href="/facts/{{ job.fact_id }}#informe">Informe</a>
  <a class="btn secondary" href="/facts/{{ job.fact_id }}/audit">Auditoría</a>
  <a class="btn secondary" href="/facts/{{ job.fact_id }}/review">Corregir a mano (opcional)</a></p>
 {% else %}<p><a class="btn" href="/facts/{{ job.fact_id }}/review">Ir a la revisión</a> <a class="btn secondary" href="/facts/{{ job.fact_id }}">Ver el hecho</a></p>{% endif %}

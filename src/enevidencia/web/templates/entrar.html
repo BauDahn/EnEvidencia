@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% from "macros.html" import error as aviso_error %}{% block title %}Entrar · EnEvidencia{% endblock %}
+{% block content %}
+<div class="auth-box">
+ <p class="kicker">Cuenta</p><h1>Entrar</h1>
+ {{ aviso_error(error) }}
+ <form method="post" action="/entrar">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next }}">
+  <label for="l-user">Usuario</label>
+  <input id="l-user" name="username" value="{{ form.username or '' }}" required maxlength="24" autocomplete="username" autocapitalize="none">
+  <label for="l-pass">Contraseña</label>
+  <input id="l-pass" name="password" type="password" required maxlength="200" autocomplete="current-password">
+  <button>Entrar</button>
+ </form>
+ <p class="meta" style="margin-top:1rem">¿No tienes cuenta? <a href="/registro?next={{ next|urlencode }}">Crear cuenta</a></p>
+</div>
+{% endblock %}

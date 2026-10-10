@@ -27,9 +27,9 @@
  <p class="why"><b>Motivo</b><br>{{ s.reason }}</p></article>
 {% else %}<div class="empty"><p>Sin fuentes registradas.</p></div>{% endfor %}
 
-<div class="section-label">Afirmaciones descartadas por la verificación <span>{{ audit.discarded_claims|length }}</span></div>
-{% for c in audit.discarded_claims %}<article class="entry"><h3>{{ c.speaker or "(sin autor)" }}: {{ c.statement }}</h3>
- <blockquote class="quote" style="margin-left:0">«{{ c.quote }}»</blockquote>
+<div class="section-label">Afirmaciones descartadas o pendientes de verificación <span>{{ audit.discarded_claims|length }}</span></div>
+{% for c in audit.discarded_claims %}<article class="entry"><h3>{% if c.statement %}{{ c.speaker or "(sin autor)" }}: {{ c.statement }}{% else %}Aviso{% endif %}</h3>
+ {% if c.quote %}<blockquote class="quote" style="margin-left:0">«{{ c.quote }}»</blockquote>{% endif %}
  <p class="meta">{{ c.url }}</p><p class="why"><b>Motivo</b><br>{{ c.reason }}</p></article>
 {% else %}<div class="empty"><p>Ninguna.</p></div>{% endfor %}
 {% endblock %}

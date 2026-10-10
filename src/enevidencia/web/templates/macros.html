@@ -30,7 +30,7 @@
 {% macro pestanas(fact, activa) %}
 <nav class="tabs" aria-label="Secciones del dossier"><ul>
  <li><a href="/facts/{{ fact.id }}" {% if activa == "dossier" %}aria-current="page"{% endif %}>Dossier</a></li>
- <li><a href="/facts/{{ fact.id }}/report.html" {% if activa == "informe" %}aria-current="page"{% endif %}>Informe</a></li>
+ <li><a href="/facts/{{ fact.id }}#informe" {% if activa == "informe" %}aria-current="page"{% endif %}>Informe</a></li>
  <li><a href="/facts/{{ fact.id }}/audit" {% if activa == "auditoria" %}aria-current="page"{% endif %}>Auditoría</a></li>
  <li><a href="/facts/{{ fact.id }}/review" {% if activa == "revision" %}aria-current="page"{% endif %}>Revisión</a></li>
 </ul></nav>
@@ -44,3 +44,6 @@
  {{ aviso() }}
 </div>
 {% endmacro %}
+
+{# Para quien no es admin: en lugar de un formulario restringido #}
+{% macro solo_admin(user, path="/") %}<p class="aside-note">Esta acción está reservada al administrador. {% if not user %}<a href="/entrar?next={{ path|urlencode }}">Entrar para participar</a>{% else %}Tu cuenta no tiene permiso para ello.{% endif %}</p>{% endmacro %}

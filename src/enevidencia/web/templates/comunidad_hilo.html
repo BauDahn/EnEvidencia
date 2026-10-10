@@ -1,0 +1,52 @@
+{% extends "base.html" %}{% from "comunidad_macros.html" import normas, autor, denunciar, paginacion %}
+{% from "macros.html" import error as aviso_error %}
+{% block title %}{% if tst.shown %}{{ t.title }}{% else %}Hilo retirado{% endif %} · Comunidad · EnEvidencia{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/community.css">{% endblock %}
+{% block content %}
+<div class="com com-narrow">
+ <p class="kicker"><a href="/comunidad">Comunidad</a> · <a href="/comunidad?{{ {'categoria': t.category}|urlencode }}">{{ t.category }}</a>{% if t.pinned %} · Fijado{% endif %}{% if t.locked %} · Cerrado{% endif %}</p>
+ <article class="com-tribuna">
+  <h1>{% if tst.shown %}{{ t.title }}{% else %}[hilo retirado por moderación]{% endif %}</h1>
+  <p class="meta">{{ autor(t.author, t.author_role) }} · {{ t.created_at[:10] }} {{ t.created_at[11:16] }}{% if fact %} · Sobre el hecho <a href="/facts/{{ fact.id }}">{{ fact.title }}</a>{% endif %}</p>
+  {% if tst.note %}<p class="com-aviso">{{ tst.note }}</p>{% endif %}
+  <div class="com-texto">{% if tst.shown %}{{ t.body|comtexto }}{% else %}<p class="com-retirado">{{ tst.placeholder }}</p>{% endif %}</div>
+  <div class="com-acciones">
+   {% if t_can_edit %}<a href="/comunidad/{{ t.id }}/editar">Editar</a>{% endif %}
+   {% if t_mine and t.hidden != 2 %}<form method="post" action="/comunidad/{{ t.id }}/eliminar" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="small secondary">Eliminar</button></form>{% endif %}
+   {% if user and not t_mine %}{{ denunciar("thread", t.id, csrf_token) }}{% endif %}
+  </div>
+ </article>
+ {{ aviso_error(error) }}
+ {% if aviso %}<div class="notice" role="status"><p>{{ aviso }}</p></div>{% endif %}
+ <div class="section-label">{{ total }} {{ "respuesta" if total == 1 else "respuestas" }}</div>
+ {% if posts %}
+ <ol class="com-posts">
+ {% for p in posts %}{% set r = p.r %}
+  <li id="m{{ r.id }}" class="com-post">
+   <p class="meta">{{ autor(r.author, r.author_role) }} · {{ r.created_at[:10] }} {{ r.created_at[11:16] }}{% if r.edited_at %} · editado{% endif %}</p>
+   {% if p.note %}<p class="com-aviso">{{ p.note }}</p>{% endif %}
+   <div class="com-texto">{% if p.shown %}{{ r.body|comtexto }}{% else %}<p class="com-retirado">{{ p.placeholder }}</p>{% endif %}</div>
+   <div class="com-acciones">
+    {% if p.can_edit %}<a href="/comunidad/mensaje/{{ r.id }}/editar">Editar</a>{% endif %}
+    {% if p.mine and r.hidden == 0 %}<form method="post" action="/comunidad/mensaje/{{ r.id }}/eliminar" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="small secondary">Eliminar</button></form>{% endif %}
+    {% if user and not p.mine and r.hidden == 0 %}{{ denunciar("post", r.id, csrf_token) }}{% endif %}
+   </div>
+  </li>
+ {% endfor %}
+ </ol>
+ {{ paginacion(page, pages, "/comunidad/" ~ t.id, qs_pag) }}
+ {% else %}<div class="empty"><h3>Sin respuestas todavía</h3><p>Aún nadie ha contestado a esta carta.</p></div>{% endif %}
+ {{ normas() }}
+ {% if not user %}<p class="notice"><strong class="k">Participar</strong>Entra o crea una cuenta para participar. <a href="/entrar?next=/comunidad/{{ t.id }}">Entrar</a> · <a href="/registro?next=/comunidad/{{ t.id }}">Crear cuenta</a></p>
+ {% elif t.hidden and not user.is_admin %}<p class="meta">Este hilo ha sido retirado y no admite respuestas.</p>
+ {% elif t.locked and not user.is_admin %}<p class="meta">Este hilo está cerrado y no admite más respuestas.</p>
+ {% else %}
+ <form method="post" action="/comunidad/{{ t.id }}/responder" class="com-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label for="body">Tu respuesta</label>
+  <textarea id="body" name="body" rows="5" minlength="5" maxlength="5000" required>{{ draft }}</textarea>
+  <button>Responder</button>
+ </form>
+ {% endif %}
+</div>
+{% endblock %}

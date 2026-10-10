@@ -3,7 +3,7 @@ import io
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
+from conftest import AdminClient as TestClient
 
 from enevidencia import ingestion
 from enevidencia.ingestion import fetch_source, validate_url
@@ -83,8 +83,6 @@ def test_flujo_automatico_completo():
     assert "Inventada" not in page
     grouped = c.get("/facts/1?grouped=1").text
     assert "Importe de la renta" in grouped
-    ai = c.get("/facts/1/report-ia")
-    assert "Resumen redactado (asistido por IA" in ai.text and "[1]" in ai.text and "Metodología" in ai.text
 
     # corrección posterior: descartar una afirmación la saca del informe
     c.post("/claims/1/status", data={"status": "rejected", "next": "/facts/1/review"})
@@ -103,13 +101,10 @@ def test_auditoria_y_metodologia():
     assert "diario.example/a" in t and "inst.example/b" in t and "aceptada" in t
     assert "esta cita no existe" in t and "no aparece literalmente" in t       # afirmación descartada y motivo
     assert "Secundaria" in t or "Primaria" in t
-    rep = c.get("/facts/1/report.md").text
-    assert "Metodología" in rep and "sentencia renta" in rep and "consideradas: 2" in rep
-    assert "aceptadas: 2" in rep and "excluidas: 0" in rep and "por tipo" in rep and "no decide la verdad" in rep
-    rep = c.get("/facts/1/report.html").text
+    _gen(c)
+    rep = c.get("/facts/1").text
     assert "Metodología" in rep and "sentencia renta" in rep and "no decide la verdad" in rep
-    assert "Fuentes consideradas</dt><dd>2" in rep and "Fuentes aceptadas</dt><dd>2" in rep
-    assert "Fuentes excluidas</dt><dd>0" in rep and "Aceptadas por tipo" in rep
+    assert "consideradas: 2" in rep and "aceptadas: 2" in rep and "excluidas: 0" in rep and "Aceptadas por tipo" in rep
     assert c.get("/facts/99/audit").status_code == 404
 
 
@@ -130,7 +125,7 @@ def test_filtro_terminos_del_tema_excluye_irrelevante():
     assert "No menciona los términos del tema" in audit and "renta" in audit and "excluida" in audit
     assert len(db.claims_for_fact(1)) == 2                  # de la irrelevante no se extrajo nada
     assert not any("receta" in p.lower() for p in llm.prompts if "localiza afirmaciones" in p)
-    assert "excluidas: 1" in c.get("/facts/1/report.md").text
+    assert "Fuentes consideradas: 3" in c.get("/facts/1").text and "excluidas: 1" in c.get("/facts/1").text
 
 
 def test_filtro_duplicados_url_y_texto():
@@ -240,16 +235,6 @@ def test_extraccion_manual_posterior_desde_la_revision():
     assert db.claims_for_fact(1) == [] and len(db.claims_for_fact(1, None)) == 2   # propuestas manuales
 
 
-def test_informe_ia_indica_narrativa_rechazada():
-    def h(prompt):
-        if "Redacta en español" in prompt:
-            return "Algo inventado [9]."
-        return handler(prompt)
-    db, app, c = make(FakeLLM(handler=h))
-    run(app, c)
-    assert "Narrativa de IA no incluida" in c.get("/facts/1/report-ia").text
-
-
 def test_escapa_contenido_externo_y_enlaces_peligrosos():
     db = Storage(":memory:")
     c = TestClient(create_app(db))
@@ -348,3 +333,92 @@ def test_pdf_escaneado_falla_con_mensaje_claro():
         lambda r: httpx.Response(200, content=buf.getvalue(), headers={"content-type": "application/pdf"})))
     with pytest.raises(ValueError, match="escaneado"):
         fetch_source("https://inst.example/scan", client=cl)
+
+
+def _gen(c):
+    return c.post("/facts/1/report/generate", follow_redirects=False)
+
+
+def _setup_report(text="Según el diario la renta era 2.650 € [1]. Según el instituto era 2.400 € [2]."):
+    def h(prompt):
+        return text if "Redacta en español" in prompt else handler(prompt)
+    llm = FakeLLM(handler=h)
+    db, app, c = make(llm)
+    run(app, c)
+    return db, app, c, llm
+
+
+def _narr(llm):
+    return sum("Redacta en español" in p for p in llm.prompts)
+
+
+def test_informe_en_pagina_generado_una_vez_y_persistido():
+    db, app, c, llm = _setup_report()
+    page = c.get("/facts/1").text
+    assert "aún no tiene informe redactado" in page and "Redactar informe con IA" in page
+    assert _narr(llm) == 0
+    r = _gen(c)
+    assert r.status_code == 303 and _narr(llm) == 1
+    for _ in range(3):
+        page = c.get("/facts/1").text
+    assert _narr(llm) == 1                                   # visitar no regenera
+    assert "Asistido por IA, revisar" in page and "Resumen redactado" in page and 'href="#fn-1">[1]</a>' in page and 'id="fn-2"' in page
+    assert "Metodología" in page and "Fuentes consideradas" in page and "Redactado el" in page
+    assert "desactualizado" not in page
+    assert db.get_report(1)["accepted_claims_count"] == 2
+    # rutas de descarga eliminadas
+    for u in ("/facts/1/report.md", "/facts/1/report.html", "/facts/1/report-ia"):
+        assert c.get(u).status_code in (404, 405)
+    assert "Imprimir" not in page and "window.print" not in page
+
+
+def test_informe_desactualizado_tras_cambiar_afirmaciones():
+    db, app, c, llm = _setup_report()
+    _gen(c)
+    c.post("/claims/1/status", data={"status": "rejected", "next": "/facts/1/review"})
+    page = c.get("/facts/1").text
+    assert "Informe desactualizado" in page and "ahora hay 1" in page and _narr(llm) == 1
+
+
+def test_informe_narrativa_rechazada_con_motivo():
+    db, app, c, llm = _setup_report("Inventado [9].")
+    _gen(c)
+    page = c.get("/facts/1").text
+    assert "Redacción de IA no incluida" in page and "inexistentes: [9]" in page
+    assert "Asistido por IA, revisar" not in page
+
+
+def test_informe_escapa_html():
+    db, app, c, llm = _setup_report("Según <script>alert(1)</script> la renta era alta [1].")
+    _gen(c)
+    page = c.get("/facts/1").text
+    assert "<script>alert(1)" not in page and "&lt;script&gt;alert(1)" in page
+
+
+def test_solo_admin_genera_informe():
+    from fastapi.testclient import TestClient as Raw
+    llm = FakeLLM(handler=lambda p: "Texto [1]." if "Redacta en español" in p else handler(p))
+    db, app, c = make(llm)
+    run(app, c)
+    anon = Raw(app)
+    anon.get("/normas")
+    tok = anon.cookies["ee_csrf"]
+    assert "Redactar informe con IA" not in anon.get("/facts/1").text
+    assert anon.post("/facts/1/report/generate", data={"csrf_token": tok}, follow_redirects=False).status_code in (303, 403)
+    acc = app.state.accounts
+    user = acc.register("otra", "o@example.com", "clave-larga-123")       # usuario normal (no admin)
+    anon.cookies.set("ee_session", acc.create_session(user))
+    assert "Redactar informe con IA" not in anon.get("/facts/1").text
+    assert anon.post("/facts/1/report/generate", data={"csrf_token": tok}, follow_redirects=False).status_code == 403
+    assert db.get_report(1) is None and sum("Redacta en español" in p for p in llm.prompts) == 0
+
+
+def test_formularios_post_del_hecho_llevan_csrf():
+    import re
+    db, app, c, llm = _setup_report()
+    for _ in range(2):          # sin informe (botón) y con informe desactualizado (botón de nuevo)
+        page = c.get("/facts/1").text
+        forms = re.findall(r"<form[^>]*method=\"post\".*?</form>", page, re.S)
+        assert forms and all('name="csrf_token"' in f and f'value="{c.cookies["ee_csrf"]}"' in f for f in forms)
+        _gen(c)
+        c.post("/claims/1/status", data={"status": "rejected", "next": "/facts/1/review"})

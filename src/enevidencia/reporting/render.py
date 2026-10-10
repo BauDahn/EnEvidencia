@@ -1,17 +1,10 @@
-"""Informe HTML autocontenido (estilo dossier impreso). Sin CDNs ni dependencia de /static: se puede guardar y enviar."""
+"""Ayudas de presentación del informe en página (se escapa TODO el texto externo)."""
 from __future__ import annotations
 
 import re
 from datetime import date
-from pathlib import Path
-from typing import Callable
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 from markupsafe import Markup, escape
-
-from ..comparison import compare
-from ..models import ClaimRecord, Fact
-from ..storage import Storage
 
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
@@ -34,24 +27,13 @@ def safe_href(url: str) -> str:
     return url if str(url).lower().startswith(("http://", "https://")) else "#"
 
 
-def _env() -> Environment:
-    env = Environment(loader=FileSystemLoader(str(Path(__file__).parent / "templates")),
-                      autoescape=select_autoescape(["html"], default=True))
-    env.filters["safe_href"] = safe_href
-    env.filters["fecha"] = fecha_corta
-    return env
-
-
-_ENV = _env()
-
-
-def narrative_blocks(body: str, remap: dict[int, int]) -> list[dict]:
+def narrative_blocks(body: str, valid: set[int]) -> list[dict]:
     """Texto del LLM -> bloques (h/p/ul). Se escapa TODO y solo después se enlazan las referencias [n]
-    (renumeradas a la numeración del informe)."""
+    existentes en la lista de fuentes (ancla #fn-n)."""
     def link(text: str) -> Markup:
         def sub(m: re.Match) -> str:
-            n = remap.get(int(m.group(1)))
-            return f'<a class="ref" href="#fn-{n}">[{n}]</a>' if n else m.group(0)
+            n = int(m.group(1))
+            return f'<a class="ref" href="#fn-{n}">[{n}]</a>' if n in valid else m.group(0)
         return Markup(REF_RE.sub(sub, str(escape(text))))
 
     blocks: list[dict] = []
@@ -79,42 +61,3 @@ def narrative_blocks(body: str, remap: dict[int, int]) -> list[dict]:
             para.append(line)
     flush()
     return blocks
-
-
-def _entry(n: int, r: ClaimRecord) -> dict:
-    c, s = r.claim, r.source
-    return {"n": n, "id": c.id, "speaker": c.speaker, "statement": c.statement, "quote": c.quote, "value": c.value,
-            "outlet": s.outlet or s.title or "Fuente", "type": s.source_type.label, "published": s.published}
-
-
-def build_context(storage: Storage, fact: Fact, ai: dict | None = None, controls: dict | None = None) -> dict:
-    from . import DISCLAIMER
-    records = storage.claims_for_fact(fact.id)
-    cmp = compare(fact.id, records)
-    nums: dict[int, int] = {}                 # source_id -> n (misma numeración que el informe .md)
-    firsts: dict[int, ClaimRecord] = {}
-
-    def num(r: ClaimRecord) -> int:
-        if r.source.id not in nums:
-            nums[r.source.id] = len(nums) + 1
-            firsts[r.source.id] = r
-        return nums[r.source.id]
-
-    groups = [{"value": g.value, "entries": [_entry(num(r), r) for r in g.records]} for g in cmp.groups]
-    without = [_entry(num(r), r) for r in cmp.without_value]
-    sources = []
-    for sid, n in sorted(nums.items(), key=lambda kv: kv[1]):
-        s = firsts[sid].source
-        sources.append({"n": n, "title": s.title, "outlet": s.outlet, "author": s.author, "published": s.published,
-                        "type": s.source_type.label, "url": s.url})
-    ctx = {"fact": fact, "today": fecha_es(), "status": cmp.status, "total": cmp.total, "groups": groups,
-           "without": without, "m": storage.methodology(fact.id), "sources": sources, "disclaimer": DISCLAIMER,
-           "controls": controls, "ai": ai or {"state": "none"}, "nsources": len(sources)}
-    if ctx["ai"].get("state") == "ok":
-        remap = {n: nums[sid] for n, sid in ctx["ai"]["refs"].items() if sid in nums}
-        ctx["ai"] = {**ctx["ai"], "blocks": narrative_blocks(ctx["ai"]["body"], remap)}
-    return ctx
-
-
-def render_report_html(storage: Storage, fact: Fact, ai: dict | None = None, controls: dict | None = None) -> str:
-    return _ENV.get_template("report.html").render(**build_context(storage, fact, ai, controls))

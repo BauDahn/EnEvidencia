@@ -1,6 +1,7 @@
 """Persistencia en SQLite."""
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
@@ -41,6 +42,12 @@ CREATE TABLE IF NOT EXISTS audit_claims (
     id INTEGER PRIMARY KEY, fact_id INTEGER NOT NULL, source_id INTEGER, url TEXT NOT NULL DEFAULT '',
     statement TEXT NOT NULL DEFAULT '', speaker TEXT NOT NULL DEFAULT '', quote TEXT NOT NULL DEFAULT '',
     reason TEXT NOT NULL DEFAULT ''
+);
+-- Informe con redacción IA: se genera una vez (gasta cuota) y se muestra desde aquí
+CREATE TABLE IF NOT EXISTS fact_reports (
+    fact_id INTEGER PRIMARY KEY, text TEXT NOT NULL DEFAULT '', warnings TEXT NOT NULL DEFAULT '[]',
+    references_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, model TEXT NOT NULL DEFAULT '',
+    accepted_claims_count INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT ''
 );
 """
 
@@ -188,3 +195,21 @@ class Storage:
         return {"queries": a["queries"], "considered": considered, "accepted": accepted,
                 "excluded": max(considered - accepted, 0) if considered else 0,
                 "by_type": by_type, "by_domain": by_domain, "automatic": bool(a["queries"] or considered)}
+
+    # --- informe con redacción IA
+    def save_report(self, fact_id: int, text: str, warnings: list[str], references: list[dict], model: str,
+                    accepted_claims_count: int, error: str = "") -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO fact_reports(fact_id,text,warnings,references_json,created_at,model,"
+            "accepted_claims_count,error) VALUES (?,?,?,?,?,?,?,?)",
+            (fact_id, text, json.dumps(warnings, ensure_ascii=False), json.dumps(references, ensure_ascii=False),
+             datetime.now().isoformat(timespec="seconds"), model, accepted_claims_count, error))
+        self.conn.commit()
+
+    def get_report(self, fact_id: int) -> dict | None:
+        r = self.conn.execute("SELECT * FROM fact_reports WHERE fact_id=?", (fact_id,)).fetchone()
+        if not r:
+            return None
+        return {"fact_id": r["fact_id"], "text": r["text"], "warnings": json.loads(r["warnings"]),
+                "references": json.loads(r["references_json"]), "created_at": datetime.fromisoformat(r["created_at"]),
+                "model": r["model"], "accepted_claims_count": r["accepted_claims_count"], "error": r["error"]}

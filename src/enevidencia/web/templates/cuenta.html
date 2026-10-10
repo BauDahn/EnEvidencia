@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}Mi cuenta · EnEvidencia{% endblock %}
+{% block content %}
+<div class="auth-box">
+ <p class="kicker">Cuenta</p><h1>@{{ user.username }}</h1>
+ <p class="meta">Rol: <span class="label label-soft">{{ "administrador" if user.is_admin else "usuario" }}</span> · Miembro desde {{ user.created_at[:10] }}</p>
+ <p class="meta">Correo: {{ user.email }} (solo lo ves tú).</p>
+ <form method="post" action="/salir"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="secondary">Cerrar sesión</button></form>
+ <p class="meta" style="margin-top:1rem"><a href="/normas">Normas de convivencia y privacidad</a></p>
+</div>
+{% endblock %}

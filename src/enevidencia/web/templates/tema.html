@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% from "temas_macros.html" import tarjeta with context %}{% from "macros.html" import error as aviso_error %}
+{% set section = "temas" %}
+{% block title %}{{ topic.title }} · Temas · EnEvidencia{% endblock %}
+{% block content %}
+<div class="front"><div class="main">
+ <p class="kicker"><a href="/temas">Temas propuestos por los lectores</a></p>
+ {{ aviso_error(error) }}{% if notice %}<div class="notice" role="status"><p>{{ notice }}</p></div>{% endif %}
+ <h1>{{ topic.title }}</h1>
+ <p class="meta"><span class="label label-soft">{{ labels[topic.status] }}</span>{% if topic.hidden %} <span class="label">oculto al público</span>{% endif %}
+  Propuesto por @{{ topic.author or "usuario eliminado" }} · {{ topic.created_at[:10] }} · {{ topic.votes }} apoyo{{ "" if topic.votes == 1 else "s" }}</p>
+ {% if topic.description %}<p class="topic-desc lead">{{ topic.description }}</p>{% endif %}
+ {% if topic.fact_id %}<p><a class="btn" href="/facts/{{ topic.fact_id }}">Ver el dossier</a></p>{% endif %}
+ <p class="aside-note">El apoyo de los lectores indica interés; no decide la verdad de nada ni garantiza que el tema se investigue.</p>
+
+ <div class="topic-actions">
+ {% if user and topic.status != "rejected" %}
+  <form method="post" action="/temas/{{ topic.id }}/voto"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+   {% if voted %}<button class="secondary" aria-pressed="true">Retirar mi apoyo</button>{% else %}<button aria-pressed="false">Apoyar este tema</button>{% endif %}</form>
+  <form method="post" action="/temas/{{ topic.id }}/denunciar"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+   <label for="motivo">Denunciar este tema (datos personales, acusaciones, spam)</label>
+   <input id="motivo" name="motivo" maxlength="300" placeholder="Motivo breve"><button class="secondary">Denunciar</button></form>
+ {% elif not user %}<p><a class="btn" href="/entrar?next=/temas/{{ topic.id }}">Entrar o crear cuenta para sugerir y votar</a></p>{% endif %}
+ </div>
+
+ {% if is_admin %}
+ <section class="card-box" aria-labelledby="adm-t"><h2 id="adm-t">Administración</h2>
+  {% if not topic.fact_id %}
+  <form method="post" action="/temas/{{ topic.id }}/investigar"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+   <button>Investigar este tema</button> <span class="meta">Gasta cuota de IA.</span></form>{% endif %}
+  <form method="post" action="/temas/{{ topic.id }}/moderar" style="margin-top:.8rem"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+   {% if topic.hidden %}<button class="secondary" name="accion" value="mostrar">Mostrar</button>{% else %}<button class="secondary" name="accion" value="ocultar">Ocultar</button>{% endif %}
+   <button class="secondary" name="accion" value="rechazar">Rechazar</button>
+   <button class="secondary" name="accion" value="hecho">Marcar como hecho</button>
+   <button class="secondary" name="accion" value="reabrir">Reabrir</button></form>
+  <h3>Denuncias ({{ reports|length }})</h3>
+  {% if reports %}<ul>{% for r in reports %}<li>@{{ r.username }} · {{ r.created_at[:10] }}: {{ r.reason or "(sin motivo)" }}</li>{% endfor %}</ul>
+  {% else %}<p class="aside-note">Sin denuncias.</p>{% endif %}
+ </section>{% endif %}
+</div></div>
+{% endblock %}

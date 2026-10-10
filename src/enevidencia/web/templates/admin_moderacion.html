@@ -1,0 +1,62 @@
+{% extends "base.html" %}{% from "macros.html" import error as aviso_error %}
+{% block title %}Moderación · EnEvidencia{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/community.css">{% endblock %}
+{% macro accion(a, label, kind="", target="", rid="") %}
+<form method="post" action="/admin/moderacion/accion" class="inline-form">
+ <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="accion" value="{{ a }}">
+ {% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+ {% if target != "" %}<input type="hidden" name="target_id" value="{{ target }}">{% endif %}
+ {% if rid != "" %}<input type="hidden" name="report_id" value="{{ rid }}">{% endif %}
+ <input name="motivo" maxlength="500" placeholder="Motivo (opcional)" aria-label="Motivo">
+ <button class="small secondary">{{ label }}</button>
+</form>
+{% endmacro %}
+{% block content %}
+<div class="com">
+ <p class="kicker">Administración</p><h1>Moderación</h1>
+ <p class="dek">La moderación actúa sobre conductas y cuentas, nunca decide qué es verdad. Cada acción queda en el registro.</p>
+ {% if aviso %}<div class="notice" role="status"><p>{{ aviso }}</p></div>{% endif %}
+ {{ aviso_error(error) }}
+
+ <div class="section-label">Denuncias abiertas <span>{{ reports|length }}</span></div>
+ {% if reports %}<ul class="com-mod">
+ {% for r in reports %}
+  <li><p class="meta">{{ r.kind }} nº {{ r.target_id }}{% if r.target_author %} · de @{{ r.target_author }}{% endif %} · denuncia de @{{ r.reporter or "?" }} · {{ r.created_at[:16] }}{% if r.hidden == 1 %} · <strong>oculto</strong>{% elif r.hidden == 2 %} · eliminado por su autor{% endif %}</p>
+   <p><strong>Motivo:</strong> {{ r.reason }}</p>
+   {% if r.excerpt %}<blockquote>{{ r.excerpt }}</blockquote>{% endif %}
+   <p class="meta">{% if r.thread_id %}<a href="/comunidad/{{ r.thread_id }}">Ver en la comunidad</a>{% endif %}</p>
+   {% if r.kind in ("thread", "post") %}
+    {% if r.hidden == 1 %}{{ accion("restaurar", "Restaurar", r.kind, r.target_id) }}{% else %}{{ accion("ocultar", "Ocultar", r.kind, r.target_id) }}{% endif %}
+    {% if r.kind == "thread" %}{{ accion("bloquear", "Bloquear hilo", "thread", r.target_id) }}{{ accion("fijar", "Fijar hilo", "thread", r.target_id) }}{% endif %}
+   {% endif %}
+   {{ accion("cerrar_denuncia", "Cerrar denuncia", rid=r.id) }}
+  </li>
+ {% endfor %}</ul>
+ {% else %}<div class="empty"><h3>Sin denuncias pendientes</h3><p>No hay nada que revisar ahora mismo.</p></div>{% endif %}
+
+ {% if topic_reports %}<div class="section-label">Denuncias de temas <span>{{ topic_reports|length }}</span></div><ul class="com-mod">
+ {% for r in topic_reports %}{% if r.kind == "topic_reports" %}
+  <li><p><a href="/temas/{{ r.topic_id }}">{{ r.title }}</a> <span class="meta">· {{ r.n }} {{ "denuncia" if r.n == 1 else "denuncias" }}{% if r.hidden %} · <strong>oculto</strong>{% endif %}</span></p>
+   <p class="meta">{{ r.reasons }}</p>
+   {% if r.hidden %}{{ accion("restaurar_tema", "Restaurar tema", "", r.topic_id) }}{% else %}{{ accion("ocultar_tema", "Ocultar tema", "", r.topic_id) }}{% endif %}
+   {{ accion("cerrar_denuncias_tema", "Cerrar denuncias", "", r.topic_id) }}</li>
+ {% else %}
+  <li><p class="meta">tema nº {{ r.target_id }} · denuncia de @{{ r.reporter or "?" }}</p><p>{{ r.reason }}</p>
+   {{ accion("ocultar_tema", "Ocultar tema", "", r.target_id) }}{{ accion("cerrar_denuncia", "Cerrar denuncia", rid=r.id) }}</li>
+ {% endif %}{% endfor %}</ul>{% endif %}
+
+ <div class="section-label">Usuarios</div>
+ <table class="facts-table"><thead><tr><th>Usuario</th><th>Rol</th><th>Alta</th><th>Estado</th><th>Acción</th></tr></thead><tbody>
+ {% for u in users %}<tr><td>@{{ u.username }}</td><td>{{ "administrador" if u.role == "admin" else "usuario" }}</td><td>{{ u.created_at[:10] }}</td>
+  <td>{{ "bloqueado" if u.banned else "activo" }}</td>
+  <td>{% if u.id == user.id or u.role == "admin" %}<span class="meta">—</span>
+   {% elif u.banned %}{{ accion("desbanear", "Desbloquear", "user", u.id) }}
+   {% else %}{{ accion("banear", "Bloquear", "user", u.id) }}{% endif %}</td></tr>{% endfor %}
+ </tbody></table>
+
+ <div class="section-label">Registro de acciones</div>
+ {% if log %}<table class="facts-table"><thead><tr><th>Fecha</th><th>Admin</th><th>Acción</th><th>Objetivo</th><th>Motivo</th></tr></thead><tbody>
+ {% for m in log %}<tr><td>{{ m.created_at[:16] }}</td><td>@{{ m.admin or "?" }}</td><td>{{ m.action }}</td><td>{{ m.target }}</td><td>{{ m.reason }}</td></tr>{% endfor %}</tbody></table>
+ {% else %}<p class="meta">Todavía no se ha registrado ninguna acción.</p>{% endif %}
+</div>
+{% endblock %}

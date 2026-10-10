@@ -30,3 +30,9 @@ fuentes:
 
   # Descarga: máximo de URLs candidatas a descargar por investigación.
   max_candidatas: 30
+
+  # Texto máximo por fuente (caracteres). Lo que exceda se trunca y se anota en la auditoría.
+  max_caracteres_fuente: 120000
+
+  # Máximo de trozos de texto que se envían al LLM por fuente (limita el gasto de cuota).
+  max_trozos_extraccion: 12

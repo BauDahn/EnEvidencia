@@ -1,0 +1,9 @@
+{# Bloque de portada: temas más apoyados. Requiere `top_topics` (lista, puede estar vacía). #}
+<section aria-labelledby="tt-t" style="margin-top:1.6rem">
+ <div class="section-label" style="margin-top:0">Los más votados <span><a href="/temas">todos los temas</a></span></div>
+ <h2 id="tt-t" class="sr-only">Temas más votados</h2>
+ {% if top_topics %}
+ <ul class="latest">{% for t in top_topics %}
+  <li><a href="/temas/{{ t.id }}">{{ t.title }}</a><span class="meta">{{ t.votes }} apoyo{{ "" if t.votes == 1 else "s" }} · @{{ t.author or "?" }}</span></li>{% endfor %}</ul>
+ {% else %}<p class="aside-note">Aún no hay temas propuestos. <a href="/temas#sugerir">Sugiere el primero</a>.</p>{% endif %}
+</section>

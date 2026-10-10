@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import quote as urlquote
 
-from fastapi import FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -29,13 +29,17 @@ from ..discovery import discover
 from ..extraction import QuoteNotInSource, build_claim, suggest_candidates
 from ..extraction.llm import extract_claims
 from ..ingestion import fetch_source, source_from_text
-from ..llm import LLMError, get_client
+from ..llm import LLMError, get_client, is_quota_error
 from ..models import Fact, SourceType, Status
 from ..pipeline import domain_of, filter_sources, load_config
-from ..reporting import render_html, render_markdown
-from ..reporting.llm import render_full_html, render_full_report
-from ..reporting.render import fecha_corta, fecha_es, safe_href
+from ..reporting.llm import NarrativeRejected, generate_report
+from ..reporting.render import fecha_corta, fecha_es, narrative_blocks, safe_href
 from ..storage import Storage
+from .auth_routes import install_auth
+from .community_routes import install_community
+from .limits import BodyLimitMiddleware
+from .deps import csrf_check, current_user, require_admin
+from .topics_routes import install_topics
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -85,19 +89,38 @@ class Job:
         self.log.append(scrub(msg))
 
 
-def _is_quota(error: str) -> bool:
-    low = str(error).lower()
-    return any(m in low for m in ("429", "cuota", "quota", "resource_exhausted", "rate limit", "saturado", "reintentos"))
+_is_quota = is_quota_error
+
+
+def _is_admin(request) -> bool:
+    user = current_user(request)
+    return bool(user) and bool(user.is_admin)
+
+
+def _report_ctx_for(db: Storage, fact_id: int, n_accepted: int) -> dict | None:
+    """Informe guardado listo para la plantilla (HTML escapado, referencias enlazadas, desactualizado?)."""
+    rep = db.get_report(fact_id)
+    if not rep:
+        return None
+    refs = rep["references"]
+    return {**rep, "blocks": narrative_blocks(rep["text"], {r["n"] for r in refs}) if rep["text"] else [],
+            "outdated": rep["accepted_claims_count"] != n_accepted, "now_count": n_accepted,
+            "m": db.methodology(fact_id)}
 
 
 def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=None,
                pipeline_config: dict | None = None) -> FastAPI:
     """llm, searcher y fetcher son inyectables para probar sin red. Si llm es None se crea al necesitarlo."""
-    app = FastAPI(title="EnEvidencia")
+    app = FastAPI(title="EnEvidencia", dependencies=[Depends(csrf_check)])
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
     db = storage or Storage(os.environ.get("ENEVIDENCIA_DB", "data/enevidencia.db"))
     db.conn.executescript(LINKS_SCHEMA)
+    app.add_middleware(BodyLimitMiddleware)  # 413 antes de csrf_check y de leer formularios
+    install_auth(app, db, TEMPLATES)  # cuentas, CSRF y cabeceras de seguridad
+    admin = [Depends(require_admin)]  # solo el administrador escribe; la lectura es pública
     cfg = pipeline_config if pipeline_config is not None else load_config()
+    ingestion.MAX_SOURCE_CHARS = int(cfg.get("max_caracteres_fuente", ingestion.MAX_SOURCE_CHARS))
+    ext_limits = {"max_chunks": int(cfg.get("max_trozos_extraccion", 12))}
     jobs: dict[str, Job] = {}
     lock = threading.Lock()
     raw_fetch = fetcher or fetch_source
@@ -108,6 +131,9 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
 
     def get_llm():
         return llm if llm is not None else get_client()  # puede lanzar LLMError con instrucciones
+
+    def _report_ctx(fact_id: int, n: int):
+        return _report_ctx_for(db, fact_id, n)
 
     def page(request: Request, name: str, **ctx):
         return TEMPLATES.TemplateResponse(request, name, ctx)
@@ -123,7 +149,7 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
         cards.reverse()  # lo más reciente primero
         cards.sort(key=lambda c: c["claims"] == 0)  # la apertura es un hecho con afirmaciones, si lo hay (orden estable)
         sources = db.list_sources()
-        return {"cards": cards, "facts": db.list_facts(), "sources": sources, "latest_sources": sources[::-1][:6],
+        return {"top_topics": app.state.topics.top(3), "cards": cards, "facts": db.list_facts(), "sources": sources, "latest_sources": sources[::-1][:6],
                 "error": error}
 
     def link(fact_id: int, source_id: int) -> None:
@@ -188,11 +214,13 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
             total, partial = 0, ""
             for i, src in enumerate(accepted, 1):
                 job.note(f"[{i}/{len(accepted)}] Extrayendo de {src.url}")
-                out = extract_claims(src, fact.id, model, topic=fact.title)
+                out = extract_claims(src, fact.id, model, topic=fact.title, **ext_limits)
+                unverified = {id(c) for c in out.unverified}
                 for c in out.claims:
-                    c.status = Status.ACCEPTED   # ya llevan la cita verificada literalmente por el código
+                    # cita y atribución verificadas por el código -> aceptada; atribución dudosa -> queda PROPOSED
+                    c.status = Status.PROPOSED if id(c) in unverified else Status.ACCEPTED
                     db.add_claim(c)
-                for dsc in out.discarded:
+                for dsc in [*out.discarded, *out.notes]:
                     db.add_audit_claim(fact.id, src.id, src.url, dsc)
                 total += len(out.claims)
                 with lock:
@@ -224,10 +252,10 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
             total = 0
             for src in todo:
                 job.note(f"Extrayendo afirmaciones de {src.url}")
-                res = extract_claims(src, fact.id, model, topic=fact.title)
+                res = extract_claims(src, fact.id, model, topic=fact.title, **ext_limits)
                 for c in res.claims:
                     db.add_claim(c)
-                for dsc in res.discarded:
+                for dsc in [*res.discarded, *res.notes]:
                     db.add_audit_claim(fact.id, src.id, src.url, dsc)
                 total += len(res.claims)
                 with lock:
@@ -246,12 +274,21 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
     def index(request: Request):
         return page(request, "index.html", **home_ctx(request.query_params.get("error")))
 
-    @app.post("/facts")
+    @app.post("/facts", dependencies=admin)
     def new_fact(title: str = Form(...), description: str = Form("")):
         fact = db.add_fact(Fact(title.strip(), description.strip()))
         return RedirectResponse(f"/facts/{fact.id}", status_code=303)
 
-    @app.post("/investigate")
+    def launch_investigation(topic: str, model=None) -> Job:
+        """Crea el hecho y lanza el job de investigación (gasta cuota). Lanza LLMError si no hay LLM disponible.
+        Reutilizado por /investigate y por /temas/{id}/investigar."""
+        model = model or get_llm()
+        fact = db.add_fact(Fact(topic))
+        return start(Job("investigar", fact.id, next_url=f"/facts/{fact.id}"), investigate_task(fact, model))
+
+    app.state.launch_investigation = launch_investigation
+
+    @app.post("/investigate", dependencies=admin)
     def investigate(request: Request, topic: str = Form(...)):
         topic = topic.strip()
         if not topic:
@@ -260,11 +297,10 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
             model = get_llm()
         except LLMError as e:  # sin clave: nada se crea; el modo manual sigue disponible
             return page(request, "index.html", **home_ctx(scrub(e)))
-        fact = db.add_fact(Fact(topic))
-        job = start(Job("investigar", fact.id, next_url=f"/facts/{fact.id}"), investigate_task(fact, model))
+        job = launch_investigation(topic, model)
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
-    @app.post("/facts/{fact_id}/extract")
+    @app.post("/facts/{fact_id}/extract", dependencies=admin)
     def extract(request: Request, fact_id: int):
         fact = db.get_fact(fact_id)
         if not fact:
@@ -307,7 +343,7 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
         return page(request, "review.html", fact=fact, sources=sources, links=links, by_source=by_source, stats=stats,
                     types=list(SourceType), Status=Status, error=request.query_params.get("error"))
 
-    @app.post("/sources/{source_id}/status")
+    @app.post("/sources/{source_id}/status", dependencies=admin)
     def source_status(source_id: int, status: str = Form(...), next: str = Form("")):
         st = Status(status)
         db.set_source_status(source_id, st)
@@ -318,7 +354,7 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
                 db.conn.commit()
         return RedirectResponse(_local(next, f"/sources/{source_id}"), status_code=303)
 
-    @app.post("/claims/{claim_id}/status")
+    @app.post("/claims/{claim_id}/status", dependencies=admin)
     def claim_status(claim_id: int, status: str = Form(...), next: str = Form("/")):
         st = Status(status)
         row = db.conn.execute("SELECT s.status AS ss FROM claims c JOIN sources s ON s.id=c.source_id WHERE c.id=?",
@@ -339,7 +375,7 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
         literal = {r.claim.id: r.claim.value for r in records}
         error = request.query_params.get("error")
         sections = None
-        if request.query_params.get("grouped"):
+        if request.query_params.get("grouped") and _is_admin(request):  # gasta cuota de IA: solo admin
             try:
                 groups = group_claims(records, get_llm())
                 sections = compare_grouped(fact_id, records, groups)
@@ -351,7 +387,8 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
             (fact_id, Status.PROPOSED.value)).fetchone()[0]
         return page(request, "fact.html", fact=fact, cmp=compare(fact_id, records), sections=sections, literal=literal,
                     sources=db.list_sources(Status.ACCEPTED), error=error, pending_claims=len(pending),
-                    pending_sources=n_pending_src, m=db.methodology(fact_id))
+                    pending_sources=n_pending_src, m=db.methodology(fact_id),
+                    report=_report_ctx(fact_id, len(records)), is_admin=_is_admin(request))
 
     @app.get("/facts/{fact_id}/audit", response_class=HTMLResponse)
     def audit_view(request: Request, fact_id: int):
@@ -360,45 +397,23 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
             return PlainTextResponse("Hecho no encontrado", status_code=404)
         return page(request, "audit.html", fact=fact, audit=db.audit(fact_id), m=db.methodology(fact_id), cfg=cfg)
 
-    @app.get("/facts/{fact_id}/report.md", response_class=PlainTextResponse)
-    def report_md(fact_id: int):
-        fact = db.get_fact(fact_id)
-        return PlainTextResponse(render_markdown(db, fact), media_type="text/markdown; charset=utf-8") if fact \
-            else PlainTextResponse("No encontrado", status_code=404)
-
-    @app.get("/facts/{fact_id}/report.html", response_class=HTMLResponse)
-    def report_html(fact_id: int, descargar: int = 0):
+    @app.post("/facts/{fact_id}/report/generate", dependencies=[Depends(require_admin)])
+    def report_generate(request: Request, fact_id: int):
+        """Redacta el informe con IA UNA vez (gasta cuota) y lo guarda. Solo admin."""
         fact = db.get_fact(fact_id)
         if not fact:
             return PlainTextResponse("No encontrado", status_code=404)
-        if descargar:   # versión descargable: sin controles de navegación
-            return HTMLResponse(render_html(db, fact), headers={
-                "Content-Disposition": f'attachment; filename="enevidencia-informe-{fact_id}.html"'})
-        base = f"/facts/{fact_id}"
-        return HTMLResponse(render_html(db, fact, controls={
-            "back": base, "md": f"{base}/report.md", "download": f"{base}/report.html?descargar=1",
-            "alt": {"href": f"{base}/report-ia", "label": "Ver con redacción IA"}}))
-
-    @app.get("/facts/{fact_id}/report-ia")
-    def report_ai(fact_id: int, fmt: str = "html", descargar: int = 0):
-        fact = db.get_fact(fact_id)
-        if not fact:
-            return PlainTextResponse("No encontrado", status_code=404)
-        base = f"/facts/{fact_id}"
         try:
-            if fmt == "md":
-                return PlainTextResponse(render_full_report(db, fact, get_llm()), media_type="text/markdown; charset=utf-8")
-            if descargar:
-                return HTMLResponse(render_full_html(db, fact, get_llm(), scrub=scrub), headers={
-                    "Content-Disposition": f'attachment; filename="enevidencia-informe-ia-{fact_id}.html"'})
-            return HTMLResponse(render_full_html(db, fact, get_llm(), scrub=scrub, controls={
-                "back": base, "md": f"{base}/report-ia?fmt=md", "download": f"{base}/report-ia?descargar=1",
-                "alt": {"href": f"{base}/report.html", "label": "Ver sin redacción IA"}}))
+            model = get_llm()
+            generate_report(db, fact, model, model=getattr(model, "model", type(model).__name__))
+        except NarrativeRejected as e:
+            return RedirectResponse(f"/facts/{fact_id}?error={urlquote(scrub(e))}#informe", status_code=303)
         except LLMError as e:
-            return RedirectResponse(f"/facts/{fact_id}?error={urlquote(scrub(e))}", status_code=303)
+            return RedirectResponse(f"/facts/{fact_id}?error={urlquote(scrub(e))}#informe", status_code=303)
+        return RedirectResponse(f"/facts/{fact_id}#informe", status_code=303)
 
     # ---- fuentes y afirmaciones manuales
-    @app.post("/sources")
+    @app.post("/sources", dependencies=admin)
     def new_source(url: str = Form(...), text: str = Form(""), kind: str = Form(""), outlet: str = Form(""),
                    author: str = Form(""), title: str = Form(""), published: str = Form("")):
         try:
@@ -422,12 +437,12 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
         return page(request, "source.html", s=src, facts=db.list_facts(), types=list(SourceType),
                     candidates=suggest_candidates(src.text), error=request.query_params.get("error"))
 
-    @app.post("/sources/{source_id}/type")
+    @app.post("/sources/{source_id}/type", dependencies=admin)
     def change_type(source_id: int, source_type: str = Form(...), next: str = Form("")):
         db.set_source_type(source_id, SourceType(source_type))
         return RedirectResponse(_local(next, f"/sources/{source_id}"), status_code=303)
 
-    @app.post("/claims")
+    @app.post("/claims", dependencies=admin)
     def new_claim(source_id: int = Form(...), fact_id: int = Form(...), statement: str = Form(...),
                   speaker: str = Form(...), quote: str = Form(...), value: str = Form("")):
         src = db.get_source(source_id)
@@ -437,14 +452,32 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
             return RedirectResponse(f"/sources/{source_id}?error={urlquote(str(e))}", status_code=303)
         return RedirectResponse(f"/facts/{fact_id}", status_code=303)
 
+    install_topics(app, db)  # /temas (módulo propio)
+    install_community(app, db)  # /comunidad y /admin/moderacion (módulo propio)
     return app
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
+    """`enevidencia` arranca el servidor (solo 127.0.0.1); `enevidencia make-admin <usuario>` promueve/recupera un admin."""
+    import sys
+
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == "make-admin":
+        if len(args) != 2:
+            print("Uso: enevidencia make-admin <usuario>")
+            return 2
+        from ..accounts import Accounts
+
+        db = Storage(os.environ.get("ENEVIDENCIA_DB", "data/enevidencia.db"))
+        ok = Accounts(db.conn).make_admin(args[1])
+        print(f"{args[1]} es ahora administrador." if ok else f"No existe el usuario {args[1]!r}.")
+        return 0 if ok else 1
     import uvicorn
 
+    # uvicorn solo confía en cabeceras X-Forwarded-* de 127.0.0.1 (o FORWARDED_ALLOW_IPS); ver README
     uvicorn.run(create_app(), host="127.0.0.1", port=8000)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

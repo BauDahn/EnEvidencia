@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import tipo, estado_fuente, error as aviso_error %}
+{% extends "base.html" %}{% from "macros.html" import tipo, estado_fuente, error as aviso_error, solo_admin %}
 {% set section = "hechos" %}
 {% block content %}
 {{ aviso_error(error) }}
@@ -51,7 +51,8 @@
 
   <section aria-labelledby="add-src" style="margin-top:2rem">
    <div class="section-label" id="add-src">Añadir fuente <span>modo manual</span></div>
-   <form method="post" action="/sources" class="form-grid">
+   {% if user and user.is_admin %}
+   <form method="post" action="/sources" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="wide"><label for="s-url">URL</label><input id="s-url" name="url" placeholder="http/https; también PDF con texto" required></div>
     <div class="wide"><label for="s-text">Texto original</label><textarea id="s-text" name="text" rows="6" placeholder="Si lo dejas vacío, se descarga de la URL"></textarea></div>
     <div><label for="s-kind">Tipo de documento</label><input id="s-kind" name="kind" placeholder="entrevista, sentencia, comunicado, noticia…"></div>
@@ -61,6 +62,7 @@
     <div><label for="s-pub">Fecha de publicación</label><input id="s-pub" name="published" type="date"></div>
     <div class="wide"><button>Guardar fuente</button></div>
    </form>
+   {% else %}{{ solo_admin(user, request.url.path) }}{% endif %}
   </section>
  </div>
 
@@ -68,11 +70,13 @@
   <section class="card-box" id="investigar" aria-labelledby="inv-t">
    <p class="kicker">Servicio al lector</p>
    <h2 id="inv-t">Investigar un tema</h2>
-   <form method="post" action="/investigate">
+   {% if user and user.is_admin %}
+   <form method="post" action="/investigate"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label for="topic">Tema o hecho concreto</label>
     <input id="topic" name="topic" placeholder="p. ej. Renta exigida en el contrato de alquiler X" required>
     <button>Investigar</button>
    </form>
+   {% else %}{{ solo_admin(user, request.url.path) }}{% endif %}
    <p class="aside-note" style="margin-top:.9rem">Proceso automático de principio a fin: la IA propone consultas y afirmaciones; el código filtra las fuentes con criterios objetivos (config/pipeline.yaml) y verifica cada cita. No tienes que aceptar nada (así no se introduce tu sesgo); todo queda en la auditoría y puedes corregirlo después. Los textos se envían a Google (Gemini): consulta el aviso de privacidad del README.</p>
   </section>
 
@@ -85,13 +89,17 @@
    {% else %}<p class="aside-note">Sin fuentes todavía. Aparecerán aquí en cuanto investigues un tema o añadas una a mano.</p>{% endif %}
   </section>
 
+  {% include "_temas_lateral.html" %}
+
   <section class="card-box" id="nuevo-hecho" aria-labelledby="nh-t" style="margin-top:1.6rem">
    <h3 id="nh-t">Nuevo hecho (modo manual)</h3>
-   <form method="post" action="/facts">
+   {% if user and user.is_admin %}
+   <form method="post" action="/facts"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label for="f-title">Título</label><input id="f-title" name="title" placeholder="p. ej. Renta exigida en el contrato" required>
     <label for="f-desc">Descripción (opcional)</label><textarea id="f-desc" name="description" rows="3"></textarea>
     <button class="secondary">Crear</button>
    </form>
+   {% else %}{{ solo_admin(user, request.url.path) }}{% endif %}
   </section>
  </aside>
 </div>

@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "macros.html" import tipo, error as aviso_error %}{% set section = "fuentes" %}
+{% extends "base.html" %}{% from "macros.html" import tipo, error as aviso_error, solo_admin %}{% set section = "fuentes" %}
 {% block title %}{{ s.title or s.url }} · EnEvidencia{% endblock %}
 {% block content %}
 <div class="dossier-head">
@@ -19,15 +19,16 @@
   <section class="card-box">
    <p class="kicker">Ficha</p>
    <p>Clasificación: {{ tipo(s) }}</p><p class="meta" style="margin-bottom:.8rem">{{ s.classification_reason }}</p>
-   <form method="post" action="/sources/{{ s.id }}/type">
+   {% if user and user.is_admin %}<form method="post" action="/sources/{{ s.id }}/type"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label for="stype">Tipo de fuente</label>
     <select id="stype" name="source_type">{% for t in types %}<option value="{{ t.value }}" {{ "selected" if t == s.source_type }}>{{ t.label }}</option>{% endfor %}</select>
-    <button class="secondary">Corregir clasificación</button></form>
+    <button class="secondary">Corregir clasificación</button></form>{% else %}{{ solo_admin(user, request.url.path) }}{% endif %}
   </section>
   <section class="card-box">
    <h2>Registrar afirmación</h2>
-   {% if facts %}
-   <form method="post" action="/claims"><input type="hidden" name="source_id" value="{{ s.id }}">
+   {% if not (user and user.is_admin) %}{{ solo_admin(user, request.url.path) }}
+   {% elif facts %}
+   <form method="post" action="/claims"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="source_id" value="{{ s.id }}">
     <label for="c-fact">Hecho</label>
     <select id="c-fact" name="fact_id" required>{% for f in facts %}<option value="{{ f.id }}">{{ f.title }}</option>{% endfor %}</select>
     <label for="c-st">Afirmación</label><input id="c-st" name="statement" placeholder="p. ej. La renta exigida era de 2.650 €" required>

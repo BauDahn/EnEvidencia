@@ -1,0 +1,32 @@
+/* Comunidad y moderación: reutiliza las variables de portal.css; sin colores de veredicto. */
+.com-narrow{max-width:46rem}
+.com-head h1{font-size:clamp(2rem,5vw,3rem);margin-bottom:.3rem}
+.com-normas{font-family:var(--sans);font-size:.84rem;color:var(--muted);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);padding:.5rem 0;margin:.8rem 0}
+.com-normas p{margin:0}.com-normas strong{color:var(--ink)}
+.com-filtros{display:flex;flex-wrap:wrap;gap:.4rem .8rem;align-items:center;margin:1rem 0}
+.com-filtros label{margin:0}.com-filtros input,.com-filtros select{width:auto;margin:0;min-width:10rem}
+.com-lista{list-style:none;margin:0;padding:0}
+.com-item{padding:1rem 0 1.1rem;border-bottom:1px solid var(--hair)}
+.com-item.is-pinned{border-left:4px solid var(--accent);padding-left:.8rem;background:var(--paper-2)}
+.com-item h2{font-size:1.5rem;margin:.1rem 0 .3rem;overflow-wrap:anywhere}
+.com-item h2 a{color:var(--ink);text-decoration:none}.com-item h2 a:hover{text-decoration:underline}
+.com-extracto{margin:0 0 .4rem;color:var(--muted);overflow-wrap:anywhere}
+.com-autor{font-weight:600;color:var(--ink)}
+.com-badge{display:inline-block;font-family:var(--sans);font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--muted);padding:0 .35rem;color:var(--muted)}
+.com-pag{display:flex;gap:1rem;justify-content:center;align-items:center;font-family:var(--sans);font-size:.88rem;margin:1.5rem 0}
+.com-tribuna{border-bottom:3px double var(--rule);padding-bottom:1rem;margin-bottom:1rem}
+.com-tribuna h1{font-size:clamp(1.8rem,5vw,2.6rem);overflow-wrap:anywhere}
+.com-texto{overflow-wrap:anywhere;margin:.6rem 0}
+.com-retirado{font-style:italic;color:var(--muted)}
+.com-aviso{font-family:var(--sans);font-size:.82rem;border-left:3px solid var(--muted);padding-left:.6rem;color:var(--muted)}
+.com-posts{list-style:none;margin:0 0 1.5rem;padding:0}
+.com-post{border-top:1px solid var(--hair);padding:.8rem 0 .6rem}
+.com-acciones{display:flex;gap:.8rem;flex-wrap:wrap;align-items:center;font-family:var(--sans);font-size:.82rem}
+.com-acciones .inline-form{margin:0}
+.com-denuncia{margin:0}.com-denuncia form{margin-top:.5rem;max-width:26rem}
+.com-form{margin-top:1rem}
+.com-bloque{margin-top:2.5rem;border-top:1px solid var(--hair);padding-top:.5rem}
+.com-bloque-lista{list-style:none;padding:0;margin:0 0 .5rem}.com-bloque-lista li{padding:.25rem 0}
+.com-mod{list-style:none;padding:0}.com-mod li{border:1px solid var(--hair);border-top:3px solid var(--ink);padding:.8rem 1rem;margin-bottom:1rem}
+.com-mod blockquote{margin:.4rem 0;padding-left:.8rem;border-left:3px solid var(--hair);color:var(--muted);overflow-wrap:anywhere}
+.com-mod .inline-form input{min-width:11rem}

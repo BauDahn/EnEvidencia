@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% from "macros.html" import error as aviso_error %}
+{% block title %}Editar · Comunidad · EnEvidencia{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/community.css">{% endblock %}
+{% block content %}
+<div class="com com-narrow">
+ <p class="kicker"><a href="/comunidad">Comunidad</a></p><h1>Editar mensaje</h1>
+ <p class="meta">Solo puedes editar durante los primeros 15 minutos.</p>
+ {{ aviso_error(error) }}
+ <form method="post" action="{% if kind == 'post' %}/comunidad/mensaje/{{ row.id }}/editar{% else %}/comunidad/{{ row.id }}/editar{% endif %}" class="com-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label for="body">Texto</label>
+  <textarea id="body" name="body" rows="9" minlength="5" maxlength="5000" required>{{ body }}</textarea>
+  <button>Guardar</button> <a class="btn secondary" href="/comunidad/{{ row.thread_id if kind == 'post' else row.id }}">Cancelar</a>
+ </form>
+</div>
+{% endblock %}

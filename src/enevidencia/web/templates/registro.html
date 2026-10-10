@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% from "macros.html" import error as aviso_error %}{% block title %}Crear cuenta · EnEvidencia{% endblock %}
+{% block content %}
+<div class="auth-box">
+ <p class="kicker">Cuenta</p><h1>Crear cuenta</h1>
+ <p>Con una cuenta puedes participar en el portal. La lectura de dossiers, auditorías e informes es pública y no la necesita.</p>
+ {{ aviso_error(error) }}
+ <form method="post" action="/registro">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next }}"><input type="hidden" name="stamp" value="{{ stamp }}">
+  <div style="position:absolute;left:-9999px" aria-hidden="true"><label for="r-web">No rellenar</label><input id="r-web" name="website" tabindex="-1" autocomplete="off"></div>
+  <label for="r-user">Usuario</label>
+  <input id="r-user" name="username" value="{{ form.username or '' }}" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" autocomplete="username" autocapitalize="none">
+  <p class="meta">De 3 a 24 caracteres: letras, números o guion bajo. Es público.</p>
+  <label for="r-mail">Correo electrónico</label>
+  <input id="r-mail" name="email" type="email" value="{{ form.email or '' }}" required maxlength="120" autocomplete="email">
+  <p class="meta">No se muestra a nadie.</p>
+  <label for="r-pass">Contraseña</label>
+  <input id="r-pass" name="password" type="password" required minlength="10" maxlength="200" autocomplete="new-password">
+  <p class="meta">Al menos 10 caracteres.</p>
+  <label class="check" for="r-ok"><input id="r-ok" type="checkbox" name="acepto" value="1" required>
+   <span>He leído y acepto las <a href="/normas" target="_blank" rel="noopener">normas de convivencia y el aviso de privacidad</a>.</span></label>
+  <button>Crear cuenta</button>
+ </form>
+ <p class="meta" style="margin-top:1rem">¿Ya tienes cuenta? <a href="/entrar?next={{ next|urlencode }}">Entrar</a></p>
+</div>
+{% endblock %}

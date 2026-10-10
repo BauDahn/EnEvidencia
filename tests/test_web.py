@@ -1,4 +1,4 @@
-from fastapi.testclient import TestClient
+from conftest import AdminClient as TestClient
 
 from conftest import TEXT_A
 from enevidencia.storage import Storage
@@ -18,4 +18,4 @@ def test_full_flow():
                             "quote": "2.650 €", "value": "2650"})
     page = c.get("/facts/1").text
     assert "Renta 2.650" in page and "https://a.com" in page
-    assert c.get("/facts/1/report.md").status_code == 200
+    assert c.get("/facts/1/report.md").status_code == 404

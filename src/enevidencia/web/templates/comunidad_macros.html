@@ -1,0 +1,25 @@
+{% macro normas() %}
+<aside class="com-normas" aria-label="Normas de la comunidad">
+ <p><strong>Normas breves.</strong> Respeto ante todo. Sin datos personales de particulares. Sin acusaciones sin fuente: <em>aporta fuentes</em>. Lo que se publica aquí son opiniones de lectores, no evidencia, y no entra en los dossiers. <a href="/normas">Leer las normas</a>.</p>
+</aside>
+{% endmacro %}
+
+{% macro autor(username, role) %}<span class="com-autor">@{{ username }}</span>{% if role == "admin" %} <span class="com-badge">Admin</span>{% endif %}{% endmacro %}
+
+{% macro denunciar(kind, target_id, csrf_token) %}
+<details class="com-denuncia"><summary>Denunciar</summary>
+ <form method="post" action="/comunidad/denunciar">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="target_id" value="{{ target_id }}">
+  <label for="rz-{{ kind }}-{{ target_id }}">Motivo</label>
+  <input id="rz-{{ kind }}-{{ target_id }}" name="reason" maxlength="500" required placeholder="Qué incumple las normas">
+  <button class="small secondary">Enviar denuncia</button>
+ </form></details>
+{% endmacro %}
+
+{% macro paginacion(page, pages, base, qs) %}
+{% if pages > 1 %}<nav class="com-pag" aria-label="Paginación">
+ {% if page > 1 %}<a href="{{ base }}?{{ qs(page - 1) }}" rel="prev">« Anterior</a>{% endif %}
+ <span>Página {{ page }} de {{ pages }}</span>
+ {% if page < pages %}<a href="{{ base }}?{{ qs(page + 1) }}" rel="next">Siguiente »</a>{% endif %}
+</nav>{% endif %}
+{% endmacro %}

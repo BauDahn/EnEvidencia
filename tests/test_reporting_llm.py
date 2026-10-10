@@ -3,7 +3,7 @@ import pytest
 from enevidencia.llm import FakeLLM
 from enevidencia.models import Claim, Fact, Source, SourceType
 from enevidencia.reporting import DISCLAIMER
-from enevidencia.reporting.llm import NarrativeRejected, draft_narrative, render_full_report
+from enevidencia.reporting.llm import NarrativeRejected, draft_narrative
 from enevidencia.storage import Storage
 
 
@@ -24,7 +24,7 @@ def test_valid(setup):
     db, fact = setup
     r = draft_narrative(db, fact, FakeLLM(text_responses=[GOOD]))
     assert r.warnings == [] and set(r.references) == {1, 2}
-    assert "[1]" in r.text and "## Fuentes" in r.text
+    assert "[1]" in r.text
 
 
 def test_nonexistent_ref_rejected(setup):
@@ -54,15 +54,12 @@ def test_no_claims_no_llm():
     assert llm.prompts == [] and "No hay afirmaciones" in r.text
 
 
-def test_sources_section_by_code(setup):
+def test_numeracion_unica_prompt_y_lista(setup):
+    """El prompt y la lista de fuentes guardada usan exactamente la misma numeración [n]."""
     db, fact = setup
-    r = draft_narrative(db, fact, FakeLLM(text_responses=["Texto [1]. ## Fuentes\n[1] inventada"]))
-    assert "http://x/0" in r.text and "http://x/1" in r.text and DISCLAIMER in r.text
-
-
-def test_full_report(setup):
-    db, fact = setup
-    out = render_full_report(db, fact, FakeLLM(text_responses=[GOOD]))
-    assert "Resumen redactado (asistido por IA, revisar)" in out
-    assert "Resumen redactado" not in render_full_report(db, fact)
-    assert "Resumen redactado" not in render_full_report(db, fact, FakeLLM())
+    llm = FakeLLM(text_responses=[GOOD])
+    r = draft_narrative(db, fact, llm)
+    for e in r.entries:
+        assert f"[{e['n']}]" in llm.prompts[0] and e["url"] in llm.prompts[0]
+        assert r.references[e["n"]].url == e["url"]
+    assert [e["url"] for e in r.entries] == ["http://x/0", "http://x/1"]
