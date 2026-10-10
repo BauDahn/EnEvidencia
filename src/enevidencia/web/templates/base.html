@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}EnEvidencia{% endblock %}</title>
+<style>
+ body{font-family:system-ui,sans-serif;max-width:60rem;margin:0 auto;padding:1rem;line-height:1.5;color:#222}
+ header{border-bottom:1px solid #ddd;margin-bottom:1rem}
+ .note{background:#f4f4f0;padding:.6rem 1rem;border-left:4px solid #888;font-size:.9rem}
+ .group{border:1px solid #ccc;border-radius:6px;padding:.5rem 1rem;margin:1rem 0}
+ .tag{font-size:.75rem;background:#e8e8e8;padding:.1rem .5rem;border-radius:10px}
+ blockquote{margin:.3rem 0 .8rem;padding-left:.8rem;border-left:3px solid #bbb;color:#444}
+ .err{background:#fde8e8;padding:.5rem 1rem;border-left:4px solid #c00}
+ input,textarea,select{width:100%;box-sizing:border-box;margin:.2rem 0 .6rem;padding:.4rem;font:inherit}
+ pre{white-space:pre-wrap}
+ @media (prefers-color-scheme:dark){body{background:#181818;color:#ddd}.note{background:#2a2a28}.group{border-color:#444}.tag{background:#333}blockquote{color:#aaa}input,textarea,select{background:#222;color:#ddd}a{color:#8ab4f8}}
+</style></head><body>
+<header><h1><a href="/" style="text-decoration:none;color:inherit">EnEvidencia</a></h1>
+<p class="note">Este portal muestra lo que dice cada fuente. No decide qué es verdad; la clasificación de fuentes es descriptiva, no un juicio de fiabilidad.</p></header>
+{% block content %}{% endblock %}
+</body></html>

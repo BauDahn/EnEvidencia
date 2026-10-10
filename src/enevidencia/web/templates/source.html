@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}{{ s.title or s.url }}{% endblock %}{% block content %}
+<h2>{{ s.title or s.url }}</h2>
+<p><a href="{{ s.url }}">{{ s.url }}</a><br>{{ s.outlet }} {{ s.author }} · {{ s.published or "fecha desconocida" }}</p>
+<p>Clasificación: <span class="tag">{{ s.source_type.label }}</span> — {{ s.classification_reason }}</p>
+<form method="post" action="/sources/{{ s.id }}/type"><select name="source_type">
+ {% for t in types %}<option value="{{ t.value }}" {{ "selected" if t == s.source_type }}>{{ t.label }}</option>{% endfor %}</select>
+ <button>Corregir clasificación</button></form>
+{% if error %}<p class="err">{{ error }}</p>{% endif %}
+<h3>Registrar afirmación</h3>
+<form method="post" action="/claims"><input type="hidden" name="source_id" value="{{ s.id }}">
+ <select name="fact_id" required>{% for f in facts %}<option value="{{ f.id }}">{{ f.title }}</option>{% endfor %}</select>
+ <input name="statement" placeholder="Afirmación (p. ej. La renta exigida era de 2.650 €)" required>
+ <input name="speaker" placeholder="Quién lo dijo" required>
+ <textarea name="quote" rows="3" placeholder="Cita textual (debe aparecer literalmente en el texto)" required></textarea>
+ <input name="value" placeholder="Valor comparable opcional (p. ej. 2650 €)"><button>Guardar afirmación</button></form>
+{% if candidates %}<details><summary>Frases con cifras o citas ({{ candidates|length }})</summary><ul>{% for c in candidates %}<li>{{ c }}</li>{% endfor %}</ul></details>{% endif %}
+<h3>Texto original</h3><pre>{{ s.text }}</pre>
+{% endblock %}

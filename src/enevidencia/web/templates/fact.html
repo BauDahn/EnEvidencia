@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}{{ fact.title }}{% endblock %}{% block content %}
+<h2>{{ fact.title }}</h2><p>{{ fact.description }}</p>
+<p>Estado entre fuentes: <strong>{{ cmp.status }}</strong> ({{ cmp.total }} afirmaciones) ·
+<a href="/facts/{{ fact.id }}/report.md">Informe .md</a> · <a href="/facts/{{ fact.id }}/report.html">Informe .html</a></p>
+{% macro rec(r) %}<p><strong>{{ r.claim.speaker }}</strong>: {{ r.claim.statement }}
+ <span class="tag">{{ r.source.source_type.label }}</span></p>
+ <blockquote>«{{ r.claim.quote }}»</blockquote>
+ <small><a href="/sources/{{ r.source.id }}">{{ r.source.title or r.source.outlet or "Fuente" }}</a> ·
+ {{ r.source.published or "fecha desconocida" }} · <a href="{{ r.source.url }}">{{ r.source.url }}</a></small>{% endmacro %}
+{% for g in cmp.groups %}<div class="group"><h3>Valor: {{ g.value }} <span class="tag">{{ g.records|length }} fuente(s)</span></h3>
+ {% for r in g.records %}{{ rec(r) }}{% endfor %}</div>{% endfor %}
+{% if cmp.without_value %}<div class="group"><h3>Sin valor comparable</h3>{% for r in cmp.without_value %}{{ rec(r) }}{% endfor %}</div>{% endif %}
+<p>Para añadir afirmaciones, abre una fuente y marca la cita.</p>
+<ul>{% for s in sources %}<li><a href="/sources/{{ s.id }}">{{ s.title or s.url }}</a></li>{% endfor %}</ul>
+{% endblock %}

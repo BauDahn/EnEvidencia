@@ -1,0 +1,23 @@
+# Criterios de clasificación de fuentes (EDITABLE).
+# La clasificación es DESCRIPTIVA: indica qué tipo de documento es, no si es fiable.
+# Se evalúan las reglas en orden; gana la primera que coincida.
+# Siempre se puede corregir a mano desde la interfaz.
+
+rules:
+  # 1. Institucional: publicada por una institución pública u organismo oficial.
+  - type: institutional
+    reason: "Dominio de una administración u organismo público"
+    domain_suffixes: [".gob.es", ".gov", ".gov.uk", ".europa.eu", ".un.org", "boe.es", "poderjudicial.es"]
+
+  # 2. Primaria: el documento ES la declaración (entrevista, sentencia, comunicado).
+  - type: primary
+    reason: "El documento recoge directamente la declaración o resolución"
+    kind_hints: [entrevista, sentencia, comunicado, nota_de_prensa]
+
+  # 3. Secundaria: artículo o pieza que cita o resume a terceros.
+  - type: secondary
+    reason: "Pieza informativa que cita o resume a otros"
+    kind_hints: [noticia, articulo, reportaje, opinion]
+
+# Si ninguna regla coincide:
+default: secondary

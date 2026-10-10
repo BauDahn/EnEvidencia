@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block content %}
+<h2>Hechos</h2>
+<ul>{% for f in facts %}<li><a href="/facts/{{ f.id }}">{{ f.title }}</a></li>{% else %}<li>Aún no hay hechos.</li>{% endfor %}</ul>
+<form method="post" action="/facts"><h3>Nuevo hecho</h3>
+ <input name="title" placeholder="Título (p. ej. Renta exigida en el contrato)" required>
+ <textarea name="description" placeholder="Descripción (opcional)"></textarea><button>Crear</button></form>
+<h2>Fuentes</h2>
+<ul>{% for s in sources %}<li><a href="/sources/{{ s.id }}">{{ s.title or s.url }}</a> <span class="tag">{{ s.source_type.label }}</span></li>{% else %}<li>Aún no hay fuentes.</li>{% endfor %}</ul>
+<form method="post" action="/sources"><h3>Añadir fuente</h3>
+ <input name="url" placeholder="URL" required>
+ <textarea name="text" rows="6" placeholder="Texto original (si lo dejas vacío, se descarga de la URL)"></textarea>
+ <input name="kind" placeholder="Tipo de documento: entrevista, sentencia, comunicado, noticia…">
+ <input name="outlet" placeholder="Medio o institución"><input name="author" placeholder="Autor">
+ <input name="title" placeholder="Título"><input name="published" type="date"><button>Guardar fuente</button></form>
+{% endblock %}
