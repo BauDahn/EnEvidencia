@@ -1,8 +1,18 @@
 # EnEvidencia
 
+🇬🇧 [Full README in English](README.en.md)
+
+> **In short (English):** EnEvidencia is an open-source, local-first portal (Python, FastAPI, SQLite) that collects what different sources claim about the same fact, stores each claim with its provenance and a verified literal quote, and shows them side by side. An optional AI mode (Gemini) proposes queries and extracts claims, but code checks every quote against the source, and every discarded item stays visible in an audit page. It **does not decide what is true**. Quick start: `pip install -r requirements.txt && pip install -e . && enevidencia`, then open <http://127.0.0.1:8000>. Status: under construction. MIT licence.
+
+![Home page of EnEvidencia showing a topic dossier](docs/screenshot.png)
+
 > “The truth is rarely pure and never simple.” — Oscar Wilde
 
 Portal local de código abierto para recopilar afirmaciones de distintas fuentes sobre un mismo hecho, guardarlas con su procedencia y verlas comparadas. **No decide cuál es la verdad.**
+
+> 🚧 **Estado: en construcción.** El proyecto sigue en desarrollo activo; puede haber errores, cambios en la estructura y funciones incompletas.
+>
+> 🤖 **Cómo se ha hecho:** desarrollado con la ayuda de Claude (Claude Code), un asistente de IA. Yo defino la idea, los principios y las decisiones de diseño, y reviso y pruebo el resultado; buena parte del código lo ha escrito la IA.
 
 ## Instalación
 ```bash
@@ -74,6 +84,8 @@ En `/temas` cualquier usuario con sesión (no baneado) puede sugerir un tema (ti
 **Administrador.** El primer usuario registrado es admin (alta atómica: dos procesos no pueden crear dos). Con `ENEVIDENCIA_ADMIN_USER=<usuario>` solo ese nombre será admin al registrarse. Para promover o recuperar una cuenta: `enevidencia make-admin <usuario>` (usa `ENEVIDENCIA_DB`).
 
 **Registro y login.** Máximo 3 registros por IP y hora y 10 por día (persistido en la BD, sobrevive a reinicios), campo trampa (honeypot) oculto y retraso mínimo de 2 s entre mostrar y enviar el formulario (`ENEVIDENCIA_MIN_FORM_SECONDS`, 0 lo desactiva; con varios procesos fija `ENEVIDENCIA_SECRET`). El login se bloquea tras 5 fallos por (IP, usuario) y tras 20 fallos por IP, 15 minutos. *Riesgo aceptado (M4):* el formulario de registro revela si un usuario o correo ya existe (enumeración); se asume a cambio de un mensaje de error útil, mitigado por los límites anteriores.
+
+**Base de datos y concurrencia.** `Storage.conn` devuelve una conexión SQLite propia de cada hilo (peticiones y jobs en segundo plano no comparten cursores ni transacciones), en modo WAL con `busy_timeout` de 5 s. Por eso `data/` puede contener archivos `enevidencia.db-wal` y `-shm` (cubiertos por `.gitignore`: `data/` y `*.db`); no los borres con el servidor en marcha y cópialos junto al `.db` al hacer copias. Los tests usan `:memory:` compartida por URI, aislada por instancia.
 
 **Cuota de IA.** Todo lo que gasta cuota de Gemini es solo para administradores (investigar, extraer, informe, agrupación con IA `?grouped=1`); los lectores anónimos nunca disparan llamadas al LLM. Cada fuente se trunca a 120.000 caracteres y se envían como máximo 12 trozos al LLM (`config/pipeline.yaml`: `max_caracteres_fuente`, `max_trozos_extraccion`); ante un error de cuota la extracción se detiene y devuelve lo ya obtenido. Los truncados quedan en la auditoría.
 
