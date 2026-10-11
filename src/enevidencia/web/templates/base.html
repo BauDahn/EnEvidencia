@@ -7,25 +7,27 @@
 </head><body>
 <a class="skip" href="#contenido">Saltar al contenido</a>
 <header class="wrap" role="banner">
- <div class="topline"><span>{{ hoy() }}</span><span>Edición local · Datos en tu equipo</span></div>
+ <div class="topline"><span>{{ hoy() }}</span></div>
  <div class="masthead">
   <p class="title"><a href="/">EnEvidencia</a></p>
   <p class="motto">“The truth is rarely pure and never simple.” <span class="motto-author">— Oscar Wilde</span></p>
  </div>
  <hr class="rules">
  <nav class="sections" aria-label="Secciones del portal"><ul>
-  <li><a href="/" {% if section == "hechos" %}aria-current="page"{% endif %}>Hechos</a></li>
-  <li><a href="/#fuentes" {% if section == "fuentes" %}aria-current="page"{% endif %}>Fuentes</a></li>
+  <li><a href="/" {% if section == "hechos" %}aria-current="page"{% endif %}>Portada</a></li>
   <li><a href="/temas" {% if section == "temas" %}aria-current="page"{% endif %}>Temas</a></li>
   <li><a href="/comunidad" {% if section == "comunidad" %}aria-current="page"{% endif %}>Comunidad</a></li>
-{% if user and user.is_admin %}  <li><a href="/admin/moderacion" {% if section == "moderacion" %}aria-current="page"{% endif %}>Moderación</a></li>
-{% endif %}  <li><a href="/#investigar">Investigar</a></li>
-  <li><a href="#metodologia">Metodología</a></li>
-  <li class="nav-auth">{% if user %}<a href="/cuenta">@{{ user.username }}</a>
-   <form method="post" action="/salir" class="nav-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="linklike">Salir</button></form>
-   {% else %}<a href="/entrar">Entrar</a> <span aria-hidden="true">/</span> <a href="/registro">Crear cuenta</a>{% endif %}</li>
+  <li><a href="/#metodologia">Metodología</a></li>
+  <li class="nav-auth">{% if user %}<details class="acct"><summary>@{{ user.username }}</summary>
+    <ul>
+     <li><a href="/cuenta">Mi cuenta</a></li>
+{% if user.is_admin %}     <li><a href="/gestion" {% if section == "gestion" %}aria-current="page"{% endif %}>Gestión</a></li>
+     <li><a href="/admin/moderacion" {% if section == "moderacion" %}aria-current="page"{% endif %}>Moderación</a></li>
+{% endif %}     <li><form method="post" action="/salir" class="nav-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="linklike">Salir</button></form></li>
+    </ul></details>
+   {% else %}<a href="/entrar">Entrar</a><a href="/registro">Crear cuenta</a>{% endif %}</li>
  </ul></nav>
- <p class="editorial-note"><strong>Nota editorial.</strong> Este portal muestra lo que dice cada fuente. No decide qué es verdad; la clasificación de fuentes es descriptiva, no un juicio de fiabilidad.</p>
+ <p class="editorial-note">Este portal muestra lo que dice cada fuente y no decide la verdad.</p>
 </header>
 <main id="contenido" class="wrap" tabindex="-1">
 {% block content %}{% endblock %}
@@ -33,15 +35,10 @@
 <footer class="wrap site-footer" id="metodologia">
  <div class="cols">
   <section aria-labelledby="f-met"><h2 id="f-met">Metodología</h2>
-   <p>La IA propone consultas, clasifica y extrae afirmaciones; el código verifica con criterios objetivos y documentados (<code>config/pipeline.yaml</code>) que cada cita aparece literalmente en la fuente. Todo lo encontrado, también lo excluido, queda en la auditoría de cada dossier y puede corregirse a mano.</p>
-   <p>El buscador y la IA pueden introducir sesgos residuales; por eso se muestran las consultas y los motivos.</p></section>
-  <section aria-labelledby="f-pri"><h2 id="f-pri">Principios</h2>
-   <p>Sin veredictos: se muestran coincidencias y contradicciones entre lo que dicen las fuentes, nunca cuál tiene razón. Primaria, secundaria e institucional son etiquetas descriptivas, no una escala de fiabilidad. Cada afirmación lleva su fuente, su autor y su cita textual.</p></section>
-  <section aria-labelledby="f-lic"><h2 id="f-lic">Licencia y código</h2>
-   <p>Software libre bajo licencia MIT.</p>
-   <p><a href="https://github.com/BauDahn/EnEvidencia" rel="noopener noreferrer">Repositorio en GitHub</a></p>
-   <p><a href="/normas">Normas de convivencia y privacidad</a></p></section>
+   <p>La IA propone consultas, clasifica y extrae afirmaciones; el código verifica con criterios objetivos y documentados (<code>config/pipeline.yaml</code>) que cada cita aparece literalmente en la fuente. Todo lo encontrado, también lo excluido, queda en la auditoría de cada dossier. Las etiquetas de tipo de fuente son descriptivas, no una escala de fiabilidad.</p></section>
+  <section aria-labelledby="f-lic"><h2 id="f-lic">Más información</h2>
+   <p><a href="/normas">Normas y privacidad</a></p>
+   <p><a href="https://github.com/BauDahn/EnEvidencia" rel="noopener noreferrer">Código en GitHub</a> · licencia MIT</p></section>
  </div>
- <div class="colophon"><span>EnEvidencia · {{ hoy() }}</span><span>Este portal no decide la verdad.</span></div>
 </footer>
 </body></html>

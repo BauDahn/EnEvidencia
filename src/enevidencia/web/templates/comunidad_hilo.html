@@ -18,7 +18,7 @@
  </article>
  {{ aviso_error(error) }}
  {% if aviso %}<div class="notice" role="status"><p>{{ aviso }}</p></div>{% endif %}
- <div class="section-label">{{ total }} {{ "respuesta" if total == 1 else "respuestas" }}</div>
+ <h2 class="section-label">{{ total }} {{ "respuesta" if total == 1 else "respuestas" }}</h2>
  {% if posts %}
  <ol class="com-posts">
  {% for p in posts %}{% set r = p.r %}
@@ -36,11 +36,11 @@
  </ol>
  {{ paginacion(page, pages, "/comunidad/" ~ t.id, qs_pag) }}
  {% else %}<div class="empty"><h3>Sin respuestas todavía</h3><p>Aún nadie ha contestado a esta carta.</p></div>{% endif %}
- {{ normas() }}
  {% if not user %}<p class="notice"><strong class="k">Participar</strong>Entra o crea una cuenta para participar. <a href="/entrar?next=/comunidad/{{ t.id }}">Entrar</a> · <a href="/registro?next=/comunidad/{{ t.id }}">Crear cuenta</a></p>
  {% elif t.hidden and not user.is_admin %}<p class="meta">Este hilo ha sido retirado y no admite respuestas.</p>
  {% elif t.locked and not user.is_admin %}<p class="meta">Este hilo está cerrado y no admite más respuestas.</p>
  {% else %}
+ {{ normas() }}
  <form method="post" action="/comunidad/{{ t.id }}/responder" class="com-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <label for="body">Tu respuesta</label>

@@ -2,55 +2,50 @@
 {% set section = "temas" %}
 {% block title %}Temas propuestos · EnEvidencia{% endblock %}
 {% block content %}
-<div class="front">
- <div class="main">
-  <p class="kicker">Sección</p>
+<div class="narrow">
+  <p class="kicker">Temas</p>
   <h1>Temas propuestos por los lectores</h1>
-  <p class="dek lead">Los lectores sugieren qué hechos conviene contrastar y apoyan los que más les interesan. El apoyo mide interés, no verdad: no decide nada sobre lo que dicen las fuentes. El administrador elige cuándo investigar cada tema.</p>
+  <p class="dek">Los lectores sugieren qué hechos conviene contrastar y apoyan los que más les interesan. El apoyo mide interés, no verdad. El administrador elige cuándo investigar cada tema.</p>
   {{ aviso_error(error) }}
-  {% if duplicate %}<p><a class="btn secondary" href="/temas/{{ duplicate }}">Ver el tema existente</a></p>{% endif %}
+  {% if duplicate %}<p><a href="/temas/{{ duplicate }}">Ver el tema existente</a></p>{% endif %}
 
-  <nav class="tabs" aria-label="Filtrar temas"><ul>
+  <nav class="filters" aria-label="Filtrar temas"><ul>
    {% for key, name in filters.items() %}<li><a href="/temas{{ '?estado=' ~ key if key }}" {% if filtro == key %}aria-current="page"{% endif %}>{{ name }}</a></li>{% endfor %}
    {% if user and user.is_admin %}<li><a href="/temas?estado=rejected" {% if filtro == "rejected" %}aria-current="page"{% endif %}>Descartados</a></li>
    <li><a href="/temas?ocultos=1">Con ocultos</a></li>{% endif %}
   </ul></nav>
   <form method="get" action="/temas" role="search" class="topic-search">
-   <label for="q">Buscar en los temas</label>
+   <label class="sr-only" for="q">Buscar en los temas</label>
    {% if filtro %}<input type="hidden" name="estado" value="{{ filtro }}">{% endif %}
-   <input id="q" name="q" value="{{ q }}" maxlength="100" placeholder="una palabra o frase">
+   <input id="q" name="q" value="{{ q }}" maxlength="100" placeholder="Buscar en los temas">
    <button class="secondary">Buscar</button>
   </form>
 
-  <div class="section-label">{{ filters.get(filtro, "Descartados") }} <span>{{ topics|length }} tema{{ "" if topics|length == 1 else "s" }}</span></div>
   {% if topics %}
-   {% for t in topics %}{{ tarjeta(t, t.id in voted, user, labels) }}{% endfor %}
+   <div class="topic-list">{% for t in topics %}{{ tarjeta(t, t.id in voted, user, labels) }}{% endfor %}</div>
   {% else %}
   <div class="empty">
    <h3>{% if q %}Ningún tema coincide con tu búsqueda{% else %}Aún no hay temas en esta sección{% endif %}</h3>
    <p>{% if q %}Prueba con otras palabras o <a href="/temas">vuelve al listado completo</a>.{% else %}Sé la primera persona en proponer un hecho que merezca contrastarse con las fuentes.{% endif %}</p>
   </div>
   {% endif %}
- </div>
 
- <aside aria-label="Barra lateral">
-  <section class="card-box" id="sugerir" aria-labelledby="sug-t">
-   <p class="kicker">Participa</p>
-   <h2 id="sug-t">Sugerir un tema</h2>
+  <section class="step" id="sugerir" aria-labelledby="sug-t">
+   <h2 class="section-label" id="sug-t">Sugerir un tema</h2>
    {% if user %}
-   <p class="aside-note"><strong>Sé neutral.</strong> Plantea una pregunta o un hecho a contrastar, no una opinión. No incluyas datos personales de particulares ni acusaciones. Máximo {{ max_day }} sugerencias cada 24 horas. Lee las <a href="/normas">normas</a>.</p>
+   <details {% if error or form.titulo %}open{% endif %}><summary>Proponer un tema nuevo</summary>
+   <p class="meta"><strong>Sé neutral.</strong> Plantea una pregunta o un hecho a contrastar, no una opinión. Sin datos personales de particulares ni acusaciones. Máximo {{ max_day }} sugerencias cada 24 horas. <a href="/normas">Normas</a>.</p>
    <form method="post" action="/temas"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label for="t-titulo">Titular ({{ min_title }}-{{ max_title }} caracteres)</label>
     <input id="t-titulo" name="titulo" value="{{ form.titulo or '' }}" minlength="{{ min_title }}" maxlength="{{ max_title }}" required placeholder="p. ej. ¿Cuál fue la renta fijada en el contrato X?">
     <label for="t-desc">Contexto (opcional, hasta {{ max_desc }})</label>
     <textarea id="t-desc" name="descripcion" rows="4" maxlength="{{ max_desc }}">{{ form.descripcion or '' }}</textarea>
     <button>Proponer tema</button>
-   </form>
+   </form></details>
    {% else %}
-   <p>Para sugerir y apoyar temas necesitas una cuenta.</p>
+   <p class="meta">Para sugerir y apoyar temas necesitas una cuenta.</p>
    <p><a class="btn" href="/entrar?next=/temas">Entrar o crear cuenta para sugerir y votar</a></p>
    {% endif %}
   </section>
- </div>
 </div>
 {% endblock %}

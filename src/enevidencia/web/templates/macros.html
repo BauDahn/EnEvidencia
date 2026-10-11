@@ -13,26 +13,25 @@
 
 {% macro error(msg) %}{% if msg %}<div class="notice" role="alert"><strong class="k">Aviso</strong><p>{{ msg }}</p></div>{% endif %}{% endmacro %}
 
-{# Cita atribuida: «cita», según X, medio, fecha; pie con tipo de fuente y enlace #}
+{# Cita atribuida: afirmación, cita literal y una línea de pie con atribución y tipo de fuente #}
 {% macro cita(r, literal=none) %}
-<figure class="quote" style="margin-left:0;margin-right:0">
+<figure class="quote">
  <p class="claim"><strong>{{ r.claim.speaker }}</strong>: {{ r.claim.statement }}</p>
- {% if literal is not none %}<p class="literal">Valor literal: <code>{{ literal or "(sin valor)" }}</code></p>{% endif %}
  <blockquote>«{{ r.claim.quote }}»</blockquote>
+ {% if literal %}<p class="literal">Valor literal: <code>{{ literal }}</code></p>{% endif %}
  <footer>
   <span>Según <cite>{{ r.claim.speaker }}</cite>, <a href="/sources/{{ r.source.id }}">{{ r.source.outlet or r.source.title or "fuente" }}</a>, {{ r.source.published|fecha }}</span>
-  <span>{{ tipo(r.source) }} <span class="label label-soft">fuente nº {{ r.source.id }}</span></span>
-  <a class="url" href="{{ r.source.url|safe_href }}" rel="noopener noreferrer">{{ r.source.url }}</a>
+  <span>{{ tipo(r.source) }} <a class="url" href="{{ r.source.url|safe_href }}" rel="noopener noreferrer">Enlace original</a></span>
  </footer>
 </figure>
 {% endmacro %}
 
+{# Enlaces entre las páginas de un dossier (sin pestañas): se omite la página actual #}
 {% macro pestanas(fact, activa) %}
-<nav class="tabs" aria-label="Secciones del dossier"><ul>
- <li><a href="/facts/{{ fact.id }}" {% if activa == "dossier" %}aria-current="page"{% endif %}>Dossier</a></li>
- <li><a href="/facts/{{ fact.id }}#informe" {% if activa == "informe" %}aria-current="page"{% endif %}>Informe</a></li>
- <li><a href="/facts/{{ fact.id }}/audit" {% if activa == "auditoria" %}aria-current="page"{% endif %}>Auditoría</a></li>
- <li><a href="/facts/{{ fact.id }}/review" {% if activa == "revision" %}aria-current="page"{% endif %}>Revisión</a></li>
+<nav class="dossier-links" aria-label="Páginas del dossier"><ul>
+ {% if activa != "dossier" %}<li><a href="/facts/{{ fact.id }}">‹ Volver al dossier</a></li>{% endif %}
+ {% if activa != "auditoria" %}<li><a href="/facts/{{ fact.id }}/audit">Auditoría</a></li>{% endif %}
+ {% if activa != "revision" %}<li><a href="/facts/{{ fact.id }}/review">Revisión</a></li>{% endif %}
 </ul></nav>
 {% endmacro %}
 
@@ -41,7 +40,6 @@
  <p class="kicker">{{ kicker }}</p>
  <h1>{{ fact.title }}</h1>
  {% if fact.description %}<p class="dek">{{ fact.description }}</p>{% endif %}
- {{ aviso() }}
 </div>
 {% endmacro %}
 

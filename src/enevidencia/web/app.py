@@ -274,6 +274,18 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
     def index(request: Request):
         return page(request, "index.html", **home_ctx(request.query_params.get("error")))
 
+    @app.get("/gestion", response_class=HTMLResponse, dependencies=admin)
+    def gestion(request: Request):
+        return page(request, "gestion.html", error=request.query_params.get("error"))
+
+    @app.get("/fuentes", response_class=HTMLResponse)
+    def sources_list(request: Request, p: int = 1):
+        allsrc = db.list_sources()[::-1]
+        per = 25
+        pages = max(1, -(-len(allsrc) // per))
+        p = min(max(p, 1), pages)
+        return page(request, "fuentes.html", sources=allsrc[(p - 1) * per:p * per], total=len(allsrc), page=p, pages=pages)
+
     @app.post("/facts", dependencies=admin)
     def new_fact(title: str = Form(...), description: str = Form("")):
         fact = db.add_fact(Fact(title.strip(), description.strip()))
@@ -292,11 +304,11 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
     def investigate(request: Request, topic: str = Form(...)):
         topic = topic.strip()
         if not topic:
-            return RedirectResponse("/?error=Escribe+un+tema", status_code=303)
+            return RedirectResponse("/gestion?error=Escribe+un+tema", status_code=303)
         try:
             model = get_llm()
         except LLMError as e:  # sin clave: nada se crea; el modo manual sigue disponible
-            return page(request, "index.html", **home_ctx(scrub(e)))
+            return page(request, "gestion.html", error=scrub(e))
         job = launch_investigation(topic, model)
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
@@ -426,7 +438,7 @@ def create_app(storage: Storage | None = None, llm=None, searcher=None, fetcher=
                                                                      title or src.title, pub or src.published)
             db.add_source(src)
         except Exception as e:  # noqa: BLE001 - URL no válida, descarga fallida, PDF escaneado...
-            return RedirectResponse(f"/?error={urlquote(scrub(e))}", status_code=303)
+            return RedirectResponse(f"/gestion?error={urlquote(scrub(e))}", status_code=303)
         return RedirectResponse(f"/sources/{src.id}", status_code=303)
 
     @app.get("/sources/{source_id}", response_class=HTMLResponse)
@@ -469,7 +481,7 @@ def main(argv: list[str] | None = None) -> int:
         from ..accounts import Accounts
 
         db = Storage(os.environ.get("ENEVIDENCIA_DB", "data/enevidencia.db"))
-        ok = Accounts(db.conn).make_admin(args[1])
+        ok = Accounts(db).make_admin(args[1])
         print(f"{args[1]} es ahora administrador." if ok else f"No existe el usuario {args[1]!r}.")
         return 0 if ok else 1
     import uvicorn

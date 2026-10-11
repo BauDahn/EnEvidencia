@@ -3,21 +3,19 @@
 {% block content %}
 <div class="dossier-head">
  <p class="kicker">Redacción en curso</p>
- <h1>Tarea: {{ job.kind }} <span class="label">{{ {"running":"en curso","done":"terminada","error":"con error"}[job.status] }}</span></h1>
+ <h1>Tarea: {{ job.kind }} <small class="meta">{{ {"running":"en curso","done":"terminada","error":"con error"}[job.status] }}</small></h1>
 </div>
 {% if job.status == "running" %}<div class="progress" role="progressbar" aria-label="Trabajando"><i></i></div>
 <p class="meta" role="status">Trabajando… esta página se actualiza sola.</p>{% endif %}
 {{ aviso_error(job.error) }}
-<div class="section-label">Cuaderno de la tarea <span>{{ log|length }} anotaciones</span></div>
+<h2 class="section-label">Cuaderno de la tarea <span>{{ log|length }} anotaciones</span></h2>
 <pre class="log" tabindex="0">{% for l in log %}{{ l }}
 {% else %}(Sin anotaciones todavía)
 {% endfor %}</pre>
 {% if job.status != "running" %}
-<div class="section-label">Siguientes pasos</div>
+<h2 class="section-label">Siguientes pasos</h2>
 {% if job.kind == "investigar" %}<p><a class="btn" href="/facts/{{ job.fact_id }}">Ver el hecho y la comparación</a>
- <a class="btn secondary" href="/facts/{{ job.fact_id }}#informe">Informe</a>
- <a class="btn secondary" href="/facts/{{ job.fact_id }}/audit">Auditoría</a>
- <a class="btn secondary" href="/facts/{{ job.fact_id }}/review">Corregir a mano (opcional)</a></p>
-{% else %}<p><a class="btn" href="/facts/{{ job.fact_id }}/review">Ir a la revisión</a> <a class="btn secondary" href="/facts/{{ job.fact_id }}">Ver el hecho</a></p>{% endif %}
+ <a href="/facts/{{ job.fact_id }}/audit">Auditoría</a> · <a href="/facts/{{ job.fact_id }}/review">Corregir a mano (opcional)</a></p>
+{% else %}<p><a class="btn" href="/facts/{{ job.fact_id }}/review">Ir a la revisión</a> <a href="/facts/{{ job.fact_id }}">Ver el hecho</a></p>{% endif %}
 {% endif %}
 {% endblock %}

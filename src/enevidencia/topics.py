@@ -4,6 +4,7 @@ Los votos miden interés, no verdad: solo ayudan al administrador a decidir en q
 """
 from __future__ import annotations
 
+from .storage import ConnSource
 import re
 import sqlite3
 import threading
@@ -82,11 +83,11 @@ class RateLimiter:
             return True
 
 
-class Topics:
+class Topics(ConnSource):
     def __init__(self, conn: sqlite3.Connection) -> None:
-        self.conn = conn
+        self._src = conn
         self.lock = threading.Lock()
-        conn.executescript(SCHEMA)
+        self.conn.executescript(SCHEMA)
         self.vote_limiter = RateLimiter(30, 60)
 
     # ---- lectura

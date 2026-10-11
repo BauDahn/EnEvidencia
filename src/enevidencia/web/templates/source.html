@@ -1,33 +1,30 @@
-{% extends "base.html" %}{% from "macros.html" import tipo, error as aviso_error, solo_admin %}{% set section = "fuentes" %}
+{% extends "base.html" %}{% from "macros.html" import tipo, error as aviso_error %}
 {% block title %}{{ s.title or s.url }} · EnEvidencia{% endblock %}
 {% block content %}
-<div class="dossier-head">
- <p class="kicker">Fuente nº {{ s.id }}{% if s.kind %} · {{ s.kind }}{% endif %}</p>
- <h1>{{ s.title or s.url }}</h1>
- <p class="meta"><a href="{{ s.url|safe_href }}" rel="noopener noreferrer">{{ s.url }}</a></p>
- <p class="dek" style="margin-top:.6rem">{{ s.outlet }} {{ s.author }} · {{ s.published or "fecha desconocida" }}</p>
- <p class="dossier-note">Este portal muestra lo que dice cada fuente. No decide qué es verdad: la clasificación de fuentes es descriptiva, no un juicio de fiabilidad.</p>
-</div>
-{{ aviso_error(error) }}
-<div class="front" style="margin-top:1.5rem">
- <div class="main">
-  <div class="section-label" style="margin-top:0">Texto original</div>
+<div class="narrow">
+ <div class="dossier-head">
+  <p class="kicker">Fuente nº {{ s.id }}{% if s.kind %} · {{ s.kind }}{% endif %}</p>
+  <h1>{{ s.title or s.url }}</h1>
+  <p class="dek">{{ [s.outlet, s.author]|select|join(", ") }}{% if s.outlet or s.author %} · {% endif %}{{ s.published or "fecha desconocida" }}</p>
+  <p class="meta">{{ tipo(s) }} <a href="{{ s.url|safe_href }}" rel="noopener noreferrer">{{ s.url }}</a></p>
+  {% if s.classification_reason %}<p class="meta">{{ s.classification_reason }}</p>{% endif %}
+ </div>
+ {{ aviso_error(error) }}
+ <section class="step" aria-labelledby="txt-t">
+  <h2 class="section-label" id="txt-t">Texto original</h2>
   <pre class="source-text">{{ s.text }}</pre>
   {% if candidates %}<details><summary>Frases con cifras o citas ({{ candidates|length }})</summary><ul>{% for c in candidates %}<li>{{ c }}</li>{% endfor %}</ul></details>{% endif %}
- </div>
- <aside aria-label="Ficha y formularios">
-  <section class="card-box">
-   <p class="kicker">Ficha</p>
-   <p>Clasificación: {{ tipo(s) }}</p><p class="meta" style="margin-bottom:.8rem">{{ s.classification_reason }}</p>
-   {% if user and user.is_admin %}<form method="post" action="/sources/{{ s.id }}/type"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+ </section>
+ {% if user and user.is_admin %}
+ <section class="step" aria-labelledby="adm-s">
+  <h2 class="section-label" id="adm-s">Gestión de esta fuente</h2>
+  <details><summary>Corregir clasificación</summary>
+   <form method="post" action="/sources/{{ s.id }}/type"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label for="stype">Tipo de fuente</label>
     <select id="stype" name="source_type">{% for t in types %}<option value="{{ t.value }}" {{ "selected" if t == s.source_type }}>{{ t.label }}</option>{% endfor %}</select>
-    <button class="secondary">Corregir clasificación</button></form>{% else %}{{ solo_admin(user, request.url.path) }}{% endif %}
-  </section>
-  <section class="card-box">
-   <h2>Registrar afirmación</h2>
-   {% if not (user and user.is_admin) %}{{ solo_admin(user, request.url.path) }}
-   {% elif facts %}
+    <button>Corregir clasificación</button></form></details>
+  <details><summary>Registrar afirmación</summary>
+   {% if facts %}
    <form method="post" action="/claims"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="source_id" value="{{ s.id }}">
     <label for="c-fact">Hecho</label>
     <select id="c-fact" name="fact_id" required>{% for f in facts %}<option value="{{ f.id }}">{{ f.title }}</option>{% endfor %}</select>
@@ -36,8 +33,9 @@
     <label for="c-q">Cita textual</label><textarea id="c-q" name="quote" rows="3" placeholder="Debe aparecer literalmente en el texto" required></textarea>
     <label for="c-v">Valor comparable (opcional)</label><input id="c-v" name="value" placeholder="p. ej. 2650 €">
     <button>Guardar afirmación</button></form>
-   {% else %}<p>Antes de registrar una afirmación necesitas un hecho al que asociarla.</p><p><a class="btn" href="/#nuevo-hecho">Crear un hecho</a></p>{% endif %}
-  </section>
- </aside>
+   {% else %}<p>Antes de registrar una afirmación necesitas un <a href="/gestion#nuevo-hecho">hecho</a> al que asociarla.</p>{% endif %}
+  </details>
+ </section>
+ {% endif %}
 </div>
 {% endblock %}

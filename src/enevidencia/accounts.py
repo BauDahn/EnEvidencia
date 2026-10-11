@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+from .storage import ConnSource
 import hashlib
 import hmac
 import os
@@ -98,9 +99,9 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-class Accounts:
+class Accounts(ConnSource):
     def __init__(self, conn: sqlite3.Connection, clock=time.monotonic) -> None:
-        self.conn = conn
+        self._src = conn
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self._lock = threading.RLock()

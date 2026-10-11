@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
+import time
+import uuid
+import weakref
 from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -52,14 +56,100 @@ CREATE TABLE IF NOT EXISTS fact_reports (
 """
 
 
+class _SharedCacheConn(sqlite3.Connection):
+    """Solo para `:memory:` compartida: la caché compartida devuelve SQLITE_LOCKED (sin busy_timeout);
+    se reintenta unos segundos, como haría busy_timeout en una BD en archivo."""
+
+    def _retry(self, fn, *a):
+        deadline = time.monotonic() + 5.0
+        while True:
+            try:
+                return fn(*a)
+            except sqlite3.OperationalError as e:
+                if "locked" not in str(e) or time.monotonic() > deadline:
+                    raise
+                time.sleep(0.002)
+
+    def execute(self, *a):
+        return self._retry(super().execute, *a)
+
+    def commit(self):
+        return self._retry(super().commit)
+
+
 class Storage:
+    """SQLite con UNA conexión por hilo (`conn` es una propiedad).
+
+    Los hilos de peticiones y los de los jobs en segundo plano nunca comparten conexión (cursores,
+    transacciones y `lastrowid` quedan aislados). Modo WAL + busy_timeout para convivir en archivo.
+    `:memory:` usa una BD en memoria compartida (URI única por instancia) con una conexión ancla.
+    """
+
     def __init__(self, path: str | Path = "data/enevidencia.db") -> None:
-        if str(path) != ":memory:":
+        self._local = threading.local()
+        self._all: list[tuple[weakref.ref, sqlite3.Connection]] = []  # (hilo, conexión)
+        self._lock_all = threading.Lock()
+        self._closed = False
+        self._anchor: sqlite3.Connection | None = None
+        if str(path) == ":memory:":
+            self._memory = True
+            self._target = f"file:enevidencia_mem_{uuid.uuid4().hex}?mode=memory&cache=shared"
+            self._anchor = self._connect()  # mantiene viva la BD en memoria mientras exista el Storage
+        else:
+            self._memory = False
             Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(path), check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
-        self.conn.executescript(SCHEMA)
+            self._target = str(path)
+        self.conn.executescript(SCHEMA)  # esquema y migraciones, en la conexión del hilo creador
         self._migrate()
+
+    def _connect(self) -> sqlite3.Connection:
+        c = sqlite3.connect(self._target, check_same_thread=False, timeout=5.0, uri=self._memory,
+                            **({"factory": _SharedCacheConn} if self._memory else {}))
+        c.row_factory = sqlite3.Row
+        if self._memory:
+            c.execute("PRAGMA read_uncommitted=1")  # cache compartida: evita "table is locked" entre lectores/escritor
+        else:
+            c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=5000")
+        with self._lock_all:
+            # libera las conexiones de hilos que ya terminaron
+            alive = []
+            for t, old in self._all:
+                th = t()
+                if th is not None and th.is_alive():
+                    alive.append((t, old))
+                else:
+                    try:
+                        old.close()
+                    except sqlite3.Error:
+                        pass
+            alive.append((weakref.ref(threading.current_thread()), c))
+            self._all = alive
+        return c
+
+    @property
+    def conn(self) -> sqlite3.Connection:
+        """Conexión propia del hilo que llama (se abre al primer uso)."""
+        c = getattr(self._local, "conn", None)
+        if c is None:
+            if self._closed:
+                raise sqlite3.ProgrammingError("Storage cerrado")
+            c = self._local.conn = self._connect()
+        return c
+
+    def close(self) -> None:
+        """Cierra todas las conexiones abiertas (de cualquier hilo) y la ancla en memoria."""
+        self._closed = True
+        with self._lock_all:
+            conns = [c for _, c in self._all]
+            self._all = []
+        for c in conns:
+            try:
+                c.close()
+            except sqlite3.Error:
+                pass
+        self._local = threading.local()
+        self._anchor = None
 
     def _migrate(self) -> None:
         """Añade la columna status a bases de datos de la v0.1."""
@@ -213,3 +303,13 @@ class Storage:
         return {"fact_id": r["fact_id"], "text": r["text"], "warnings": json.loads(r["warnings"]),
                 "references": json.loads(r["references_json"]), "created_at": datetime.fromisoformat(r["created_at"]),
                 "model": r["model"], "accepted_claims_count": r["accepted_claims_count"], "error": r["error"]}
+
+
+class ConnSource:
+    """Mixin: `conn` de la conexión del hilo actual si se le pasó un `Storage`, o la conexión dada tal cual."""
+
+    _src: "Storage | sqlite3.Connection"
+
+    @property
+    def conn(self) -> sqlite3.Connection:
+        return self._src.conn if isinstance(self._src, Storage) else self._src

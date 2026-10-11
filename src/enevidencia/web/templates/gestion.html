@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% from "macros.html" import error as aviso_error %}
+{% set section = "gestion" %}
+{% block title %}Gestión · EnEvidencia{% endblock %}
+{% block content %}
+<div class="narrow">
+ <p class="kicker">Administración</p><h1>Gestión</h1>
+ <p class="dek">Herramientas del administrador. El resto de lectores no ve esta página.</p>
+ {{ aviso_error(error) }}
+
+ <section class="block" id="investigar" aria-labelledby="inv-t">
+  <h2 id="inv-t">Investigar un tema</h2>
+  <p class="meta">Proceso automático: la IA propone consultas y afirmaciones; el código filtra las fuentes y verifica cada cita. Todo queda en la auditoría. Los textos se envían a Google (Gemini); consulta el aviso de privacidad del README.</p>
+  <form method="post" action="/investigate"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+   <label for="topic">Tema o hecho concreto</label>
+   <input id="topic" name="topic" placeholder="p. ej. Renta exigida en el contrato de alquiler X" required>
+   <button>Investigar</button>
+  </form>
+ </section>
+
+ <section class="block" id="nuevo-hecho" aria-labelledby="nh-t">
+  <h2 id="nh-t">Nuevo hecho manual</h2>
+  <form method="post" action="/facts"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+   <label for="f-title">Título</label><input id="f-title" name="title" placeholder="p. ej. Renta exigida en el contrato" required>
+   <label for="f-desc">Descripción (opcional)</label><textarea id="f-desc" name="description" rows="3"></textarea>
+   <button>Crear hecho</button>
+  </form>
+ </section>
+
+ <section class="block" id="add-src" aria-labelledby="as-t">
+  <h2 id="as-t">Añadir fuente manual</h2>
+  <form method="post" action="/sources" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+   <div class="wide"><label for="s-url">URL</label><input id="s-url" name="url" placeholder="http/https; también PDF con texto" required></div>
+   <div class="wide"><label for="s-text">Texto original</label><textarea id="s-text" name="text" rows="6" placeholder="Si lo dejas vacío, se descarga de la URL"></textarea></div>
+   <div><label for="s-kind">Tipo de documento</label><input id="s-kind" name="kind" placeholder="entrevista, sentencia, comunicado…"></div>
+   <div><label for="s-outlet">Medio o institución</label><input id="s-outlet" name="outlet"></div>
+   <div><label for="s-author">Autor</label><input id="s-author" name="author"></div>
+   <div><label for="s-title">Título</label><input id="s-title" name="title"></div>
+   <div><label for="s-pub">Fecha de publicación</label><input id="s-pub" name="published" type="date"></div>
+   <div class="wide"><button>Guardar fuente</button></div>
+  </form>
+ </section>
+</div>
+{% endblock %}

@@ -173,13 +173,17 @@ def test_lectura_publica_y_formularios_ocultos():
     admin.post("/facts", data={"title": "Hecho público"})
     anon = TestClient(app)
     home = anon.get("/").text
-    assert "Hecho público" in home and 'action="/investigate"' not in home and "Entrar para participar" in home
+    assert "Hecho público" in home and 'action="/investigate"' not in home and 'action="/facts"' not in home
+    assert "/gestion" not in home and "Moderación" not in home        # el anónimo no ve rastro de la gestión
+    assert anon.get("/gestion", follow_redirects=False).status_code in (303, 307, 401, 403)
     assert anon.get("/facts/1").status_code == 200 and anon.get("/facts/1/audit").status_code == 200
-    assert 'action="/investigate"' in admin.get("/").text
-    assert f'name="csrf_token" value="{admin.cookies["ee_csrf"]}"' in admin.get("/").text
+    assert 'action="/investigate"' not in admin.get("/").text        # la portada no lleva formularios de administración
+    assert 'action="/investigate"' in admin.get("/gestion").text
+    assert f'name="csrf_token" value="{admin.cookies["ee_csrf"]}"' in admin.get("/gestion").text
     user = TestClient(app)
     signup(user, "beto", "b@example.org")
     assert 'action="/investigate"' not in user.get("/").text
+    assert user.get("/gestion", follow_redirects=False).status_code in (303, 307, 401, 403)
 
 
 def test_review_oculta_controles_a_no_admin():
@@ -244,3 +248,12 @@ def test_normas_y_registro_enlazan():
     c = TestClient(app)
     assert "no es público" in c.get("/normas").text
     assert 'href="/normas"' in c.get("/registro").text and 'href="/normas"' in c.get("/").text
+
+
+def test_gestion_solo_admin_y_fuentes_publicas():
+    _, app = new_app()
+    admin = AdminClient(app)
+    g = admin.get("/gestion")
+    assert g.status_code == 200 and 'action="/facts"' in g.text and 'action="/sources"' in g.text
+    assert "/gestion" in admin.get("/cuenta").text and "/admin/moderacion" in admin.get("/cuenta").text
+    assert TestClient(app).get("/fuentes").status_code == 200

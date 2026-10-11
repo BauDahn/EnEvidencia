@@ -1,20 +1,18 @@
 {# Tarjeta de tema. Todo el texto de usuario se escapa (autoescape de Jinja); nunca se enlaza automáticamente. #}
 {% macro tarjeta(t, voted, user, labels, next="/temas") %}
 <article class="topic-card" id="tema-{{ t.id }}">
+ <div class="topic-body">
+  <h3><a href="/temas/{{ t.id }}">{{ t.title }}</a></h3>
+  {% if t.description %}<p class="topic-desc">{{ t.description|truncate(160) }}</p>{% endif %}
+  <p class="meta">{{ t.votes }} apoyo{{ "" if t.votes == 1 else "s" }} · {{ labels[t.status] }}{% if t.hidden %} · oculto{% endif %} · @{{ t.author or "usuario eliminado" }} · {{ t.created_at[:10] }}{% if t.fact_id %} · <a href="/facts/{{ t.fact_id }}">Ver dossier</a>{% endif %}</p>
+ </div>
  <div class="topic-votes">
-  <b aria-label="{{ t.votes }} apoyo{{ '' if t.votes == 1 else 's' }}">{{ t.votes }}</b><span>apoyo{{ "" if t.votes == 1 else "s" }}</span>
   {% if user and t.status != "rejected" %}
   <form method="post" action="/temas/{{ t.id }}/voto"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ next }}">
-   {% if voted %}<button class="secondary" aria-pressed="true" title="Retirar tu apoyo">Apoyado</button>
-   {% else %}<button aria-pressed="false">Apoyar</button>{% endif %}
+   {% if voted %}<button class="secondary small" aria-pressed="true" title="Retirar tu apoyo">Apoyado</button>
+   {% else %}<button class="small" aria-pressed="false">Apoyar</button>{% endif %}
   </form>
-  {% elif not user %}<a class="btn secondary" href="/entrar?next=/temas">Entrar</a>{% endif %}
- </div>
- <div class="topic-body">
-  <p class="kicker"><span class="label label-soft">{{ labels[t.status] }}</span>{% if t.hidden %} <span class="label">oculto</span>{% endif %}</p>
-  <h3><a href="/temas/{{ t.id }}">{{ t.title }}</a></h3>
-  {% if t.description %}<p class="dek topic-desc">{{ t.description|truncate(220) }}</p>{% endif %}
-  <p class="meta">Propuesto por @{{ t.author or "usuario eliminado" }} · {{ t.created_at[:10] }}{% if t.fact_id %} · <a href="/facts/{{ t.fact_id }}">Ver dossier</a>{% endif %}</p>
+  {% elif not user %}<a href="/entrar?next=/temas">Entrar para apoyar</a>{% endif %}
  </div>
 </article>
 {% endmacro %}

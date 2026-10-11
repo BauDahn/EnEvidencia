@@ -6,6 +6,7 @@ Anti-spam: límite de mensajes por hora y usuario, duplicados rechazados, longit
 """
 from __future__ import annotations
 
+from .storage import ConnSource
 import re
 import sqlite3
 import threading
@@ -70,10 +71,10 @@ def paginate(total: int, page: int, per_page: int) -> tuple[int, int, int]:
     return page, pages, (page - 1) * per_page
 
 
-class Community:
+class Community(ConnSource):
     def __init__(self, conn: sqlite3.Connection, clock=time.time, edit_window: int = EDIT_WINDOW,
                  max_per_hour: int = MAX_PER_HOUR) -> None:
-        self.conn = conn
+        self._src = conn
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self._lock = threading.RLock()

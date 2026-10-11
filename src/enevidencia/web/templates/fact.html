@@ -1,106 +1,100 @@
-{% extends "base.html" %}{% from "macros.html" import pestanas, cabecera_dossier, sello, cita, error as aviso_error %}
+{% extends "base.html" %}{% from "macros.html" import pestanas, cabecera_dossier, cita, error as aviso_error %}
 {% block title %}{{ fact.title }} · EnEvidencia{% endblock %}
+{% macro lista_citas(records, ai=false) %}
+ {% for r in records[:3] %}{{ cita(r, literal[r.claim.id]) }}{% endfor %}
+ {% if records|length > 3 %}<details class="more-quotes"><summary>Ver las {{ records|length - 3 }} restantes</summary>
+  {% for r in records[3:] %}{{ cita(r, literal[r.claim.id]) }}{% endfor %}</details>{% endif %}
+{% endmacro %}
 {% macro columnas(c, ai) %}
- {% set n = c.groups|length + (1 if c.without_value else 0) %}
- <div class="columns n{{ [n, 4]|min if n > 1 else 1 }}">
+ <div class="columns">
  {% for g in c.groups %}
   <section class="column" aria-label="Valor {{ g.value }}">
    <header><h3>{{ g.value if ai else normalize_value(g.value) }}</h3>
-    <p>Valor{% if ai %} propuesto por IA{% else %} normalizado{% endif %} · {{ g.records|length }} fuente{{ "" if g.records|length == 1 else "s" }}</p></header>
-   {% for r in g.records %}{{ cita(r, literal[r.claim.id]) }}{% endfor %}
+    <p>{{ g.records|length }} afirmación{{ "" if g.records|length == 1 else "es" }}{% if ai %} · valor propuesto por IA{% endif %}</p></header>
+   {{ lista_citas(g.records, ai) }}
   </section>{% endfor %}
  {% if c.without_value %}
-  <section class="column plain" aria-label="Sin valor comparable">
+  <section class="column" aria-label="Sin valor comparable">
    <header><h3>Sin valor comparable</h3><p>{{ c.without_value|length }} {{ "afirmación" if c.without_value|length == 1 else "afirmaciones" }}</p></header>
-   {% for r in c.without_value %}{{ cita(r, literal[r.claim.id]) }}{% endfor %}
+   {{ lista_citas(c.without_value) }}
   </section>{% endif %}
  </div>
 {% endmacro %}
 {% block content %}
 {{ cabecera_dossier(fact, "dossier") }}
-{{ pestanas(fact, "dossier") }}
 {{ aviso_error(error) }}
 
-<div class="stamp-row">
- {{ sello(cmp.status, cmp.total) }}
- <div>
-  <p class="stat-line"><strong>Estado entre fuentes</strong>: {{ cmp.status }} ({{ cmp.total }} afirmaciones aceptadas)</p>
-  {% if m.automatic %}<p class="stat-line">Fuentes consideradas: {{ m.considered }} · aceptadas: {{ m.accepted }} · excluidas: {{ m.excluded }}
-   {% if m.by_type %}· por tipo: {% for k, v in m.by_type.items() %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}.
-   Aceptación automática con criterios objetivos: <a href="/facts/{{ fact.id }}/audit">ver auditoría</a>.</p>{% endif %}
- </div>
-</div>
+<p class="status-line" role="status"><span class="sr-only">Estado entre fuentes: </span><strong>{{ cmp.status }}</strong> · {{ cmp.total }} {{ "afirmación aceptada" if cmp.total == 1 else "afirmaciones aceptadas" }}. Descripción, no veredicto.</p>
+{{ pestanas(fact, "dossier") }}
 
 {% if pending_sources or pending_claims %}<div class="notice"><strong class="k">Pendiente de revisión</strong>
  <p>Hay {{ pending_sources }} fuente(s) y {{ pending_claims }} afirmación(es) propuestas sin revisar:
  <a href="/facts/{{ fact.id }}/review">revisar</a>. No cuentan hasta que las aceptes.</p></div>{% endif %}
 
-<p class="no-print">{% if sections is none %}<a class="btn secondary small" href="/facts/{{ fact.id }}?grouped=1">Agrupar por punto con IA</a>{% else %}<a class="btn secondary small" href="/facts/{{ fact.id }}">Vista simple</a>{% endif %}</p>
-
-<div class="section-label">La comparación <span>cada columna es un valor; cada recuadro, lo que dice una fuente</span></div>
-{% if cmp.total == 0 and sections is none %}
- <div class="empty"><h3>Este dossier aún no tiene afirmaciones</h3>
-  <p>Una comparación necesita al menos una afirmación aceptada con su cita literal. Abre una fuente y marca la cita para registrarla a mano, o revisa las propuestas pendientes.</p>
-  <p><a class="btn" href="/facts/{{ fact.id }}/review">Ir a la revisión</a></p></div>
-{% elif sections is none %}{{ columnas(cmp, false) }}
-{% else %}{% for grp, c in sections %}
- <div class="topic-head"><h2>{{ grp.topic }}</h2><span class="stamp {{ 'is-differ' if c.status == 'se contradicen' else ('is-none' if c.status == 'sin valor comparable' else '') }}" style="font-size:.7rem;padding:.25rem .6rem">{{ c.status }}</span></div>
- {{ columnas(c, true) }}{% endfor %}
-{% endif %}
-
-
-<section id="informe" aria-labelledby="informe-t">
-<div class="section-label" id="informe-t">Informe <span>resumen redactado con IA a partir de las afirmaciones aceptadas</span></div>
+<section id="informe" aria-labelledby="informe-t" class="step">
+<h2 class="section-label" id="informe-t">Informe</h2>
 {% if not report %}
- <div class="empty"><h3>Este dossier aún no tiene informe redactado</h3>
-  <p>El informe es un resumen narrativo, neutral y atribuido, escrito por una IA solo con las afirmaciones aceptadas de este dossier. Cada frase remite a su fuente con una referencia [n] y el código comprueba que esas referencias existan. No decide qué es verdad. Se redacta una sola vez y queda guardado, porque cada redacción consume cuota del servicio de IA.</p>
-  {% if is_admin and cmp.total %}
-  <form method="post" action="/facts/{{ fact.id }}/report/generate"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Redactar informe con IA</button></form>
-  {% elif is_admin %}<p class="meta">Necesita al menos una afirmación aceptada.</p>
-  {% else %}<p class="meta">Aún no se ha redactado. Solo la administración puede generarlo.</p>{% endif %}
- </div>
+ <p class="meta">Este dossier aún no tiene informe redactado. El informe es un resumen neutral y atribuido, escrito por IA solo con las afirmaciones aceptadas; se redacta una sola vez porque consume cuota.</p>
+ {% if is_admin and cmp.total %}
+ <form method="post" action="/facts/{{ fact.id }}/report/generate"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Redactar informe con IA</button></form>
+ {% elif is_admin %}<p class="meta">Necesita al menos una afirmación aceptada.</p>
+ {% else %}<p class="meta">Solo la administración puede generarlo.</p>{% endif %}
 {% else %}
- <p class="meta">Redactado el {{ report.created_at.strftime("%d/%m/%Y %H:%M") }}{% if report.model %} con {{ report.model }}{% endif %}
-  a partir de {{ report.accepted_claims_count }} afirmaciones aceptadas.</p>
  {% if report.outdated %}<div class="notice"><strong class="k">Informe desactualizado</strong>
   <p>Cuando se redactó había {{ report.accepted_claims_count }} afirmaciones aceptadas y ahora hay {{ report.now_count }}. El texto de abajo puede no reflejar el estado actual.</p>
   {% if is_admin %}<form method="post" action="/facts/{{ fact.id }}/report/generate"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="secondary">Volver a redactar con IA</button></form>{% endif %}</div>{% endif %}
  {% if report.error %}
   <div class="notice" role="alert"><strong class="k">Redacción de IA no incluida</strong>
-   <p>La narrativa generada se rechazó en la validación y no se muestra: {{ report.error }}. La comparación de arriba, con las citas literales, sigue siendo la referencia.</p>
+   <p>La narrativa generada se rechazó en la validación y no se muestra: {{ report.error }}. La comparación de abajo, con las citas literales, sigue siendo la referencia.</p>
    {% if is_admin %}<form method="post" action="/facts/{{ fact.id }}/report/generate"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="secondary">Reintentar redacción</button></form>{% endif %}</div>
  {% else %}
-  <h3 class="kicker">Resumen redactado <span class="label">Asistido por IA, revisar</span></h3>
+  <p class="kicker">Resumen redactado · Asistido por IA, revisar</p>
   <div class="report-body">
   {% for b in report.blocks %}
-   {% if b.kind == "h" %}<h4>{{ b.html }}</h4>{% elif b.kind == "ul" %}<ul>{% for i in b["items"] %}<li>{{ i }}</li>{% endfor %}</ul>{% else %}<p>{{ b.html }}</p>{% endif %}
+   {% if b.kind == "h" %}<h3>{{ b.html }}</h3>{% elif b.kind == "ul" %}<ul>{% for i in b["items"] %}<li>{{ i }}</li>{% endfor %}</ul>{% else %}<p>{{ b.html }}</p>{% endif %}
   {% endfor %}</div>
-  {% if report.warnings %}<div class="notice"><strong class="k">Avisos de la validación</strong>
-   <ul>{% for w in report.warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>{% endif %}
-  <h3>Fuentes citadas</h3>
+  <p class="meta">Redactado el {{ report.created_at.strftime("%d/%m/%Y %H:%M") }}{% if report.model %} con {{ report.model }}{% endif %}
+   a partir de {{ report.accepted_claims_count }} afirmaciones aceptadas.</p>
+  {% if report.warnings %}<details><summary>Avisos de la validación ({{ report.warnings|length }})</summary>
+   <ul>{% for w in report.warnings %}<li>{{ w }}</li>{% endfor %}</ul></details>{% endif %}
+  <details><summary>Fuentes citadas ({{ report.references|length }})</summary>
   <ol class="refs">{% for r in report.references %}
    <li id="fn-{{ r.n }}" value="{{ r.n }}">[{{ r.n }}] {{ [r.author, r.outlet, r.title]|select|join(", ") or "Fuente" }}
-    ({{ r.published or "fecha desconocida" }}) · <span class="label">{{ r.type }}</span> ·
+    ({{ r.published or "fecha desconocida" }}) · {{ r.type }} ·
     <a class="url" href="{{ r.url|safe_href }}" rel="noopener noreferrer">{{ r.url }}</a>
-    · <a href="/sources/{{ r.source_id }}">ver en el archivo</a></li>{% endfor %}</ol>
- {% endif %}
- {% set rm = report.m %}
- <h3>Metodología</h3>
- {% if not rm.automatic %}<p>Las fuentes de este hecho se añadieron manualmente; no hubo búsqueda automática.</p>
- {% else %}
-  <p>Consultas utilizadas: {% if rm.queries %}{% for q in rm.queries %}«{{ q }}»{% if not loop.last %}; {% endif %}{% endfor %}{% else %}no registradas{% endif %}.</p>
-  <p>Fuentes consideradas: {{ rm.considered }} · aceptadas: {{ rm.accepted }} · excluidas: {{ rm.excluded }}
-   (criterios objetivos en <code>config/pipeline.yaml</code>; motivos en la <a href="/facts/{{ fact.id }}/audit">auditoría</a>).</p>
-  {% if rm.by_type %}<p>Aceptadas por tipo: {% for k, v in rm.by_type|dictsort %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
-  {% if rm.by_domain %}<p>Aceptadas por medio/dominio: {% for k, v in rm.by_domain|dictsort %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
-  <p class="meta">El buscador y la IA que propone consultas pueden introducir sesgos que el código no elimina; por eso se muestran las consultas y todas las exclusiones. El sistema no decide la verdad.</p>
+    · <a href="/sources/{{ r.source_id }}">ver en el archivo</a></li>{% endfor %}</ol></details>
  {% endif %}
 {% endif %}
 </section>
 
-<div class="section-label">Fuentes del archivo <span>para añadir afirmaciones a mano, abre una fuente y marca la cita</span></div>
-{% if sources %}<ul class="src-list">{% for s in sources %}<li><a href="/sources/{{ s.id }}">{{ s.title or s.url }}</a></li>{% endfor %}</ul>
-{% else %}<p class="meta">No hay fuentes aceptadas en el archivo.</p>{% endif %}
-<p class="meta" style="margin-top:1rem"><a href="/facts/{{ fact.id }}/review">Corregir a mano fuentes y afirmaciones (opcional)</a></p>
+<section class="step" aria-labelledby="comp-t">
+<h2 class="section-label" id="comp-t">La comparación</h2>
+<p class="meta">Cada columna es un valor; cada recuadro, lo que dice una fuente.
+ {% if is_admin %}{% if sections is none %}<a href="/facts/{{ fact.id }}?grouped=1">Agrupar por punto con IA</a>{% else %}<a href="/facts/{{ fact.id }}">Vista simple</a>{% endif %}{% endif %}</p>
+{% if cmp.total == 0 and sections is none %}
+ <div class="empty"><h3>Este dossier aún no tiene afirmaciones</h3>
+  <p>Una comparación necesita al menos una afirmación aceptada con su cita literal. Abre una fuente y marca la cita para registrarla a mano, o <a href="/facts/{{ fact.id }}/review">revisa las propuestas pendientes</a>.</p></div>
+{% elif sections is none %}{{ columnas(cmp, false) }}
+{% else %}{% for grp, c in sections %}
+ <div class="topic-head"><h3>{{ grp.topic }}</h3><span class="meta">{{ c.status }}</span></div>
+ {{ columnas(c, true) }}{% endfor %}
+{% endif %}
+</section>
+
+<section class="step" aria-labelledby="met-t">
+<h2 class="section-label" id="met-t">Cómo se hizo</h2>
+<details><summary>Metodología y fuentes consideradas</summary>
+ {% if not m.automatic %}<p>Las fuentes de este hecho se añadieron manualmente; no hubo búsqueda automática.</p>
+ {% else %}
+  <p>Consultas utilizadas: {% if m.queries %}{% for q in m.queries %}«{{ q }}»{% if not loop.last %}; {% endif %}{% endfor %}{% else %}no registradas{% endif %}.</p>
+  <p>Fuentes consideradas: {{ m.considered }} · aceptadas: {{ m.accepted }} · excluidas: {{ m.excluded }}
+   (criterios objetivos en <code>config/pipeline.yaml</code>; motivos en la <a href="/facts/{{ fact.id }}/audit">auditoría</a>).</p>
+  {% if m.by_type %}<p>Aceptadas por tipo: {% for k, v in m.by_type|dictsort %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+  {% if m.by_domain %}<p>Aceptadas por medio/dominio: {% for k, v in m.by_domain|dictsort %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+  <p class="meta">El buscador y la IA que propone consultas pueden introducir sesgos que el código no elimina; por eso se muestran las consultas y todas las exclusiones.</p>
+ {% endif %}
+</details>
+<p class="meta">Para añadir una afirmación a mano, abre una <a href="/fuentes">fuente del archivo</a> y marca la cita.</p>
+</section>
 {% include "comunidad_bloque_hecho.html" %}
 {% endblock %}

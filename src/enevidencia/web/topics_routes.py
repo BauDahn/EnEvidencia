@@ -150,6 +150,6 @@ def topic_moderate(request: Request, topic_id: int, accion: str = Form(...)):
 
 
 def install_topics(app: FastAPI, db: Storage) -> Topics:
-    app.state.topics = Topics(db.conn)
+    app.state.topics = Topics(db)
     app.include_router(router)
     return app.state.topics

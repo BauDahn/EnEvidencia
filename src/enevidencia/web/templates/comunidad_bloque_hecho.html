@@ -1,8 +1,8 @@
 {# Bloque discreto al final del dossier. Requiere `fact`. Opiniones de lectores, no evidencia. #}
 {% set _deb = debates_de_hecho(fact.id) %}
-<section class="com-bloque" aria-labelledby="debate-lectores">
- <div class="section-label" id="debate-lectores">Debate de lectores <span>opiniones, no evidencia</span></div>
- {% if _deb[0] %}<ul class="com-bloque-lista">{% for t in _deb[0] %}<li><a href="/comunidad/{{ t.id }}">{{ t.title }}</a> <span class="meta">@{{ t.author }} · {{ t.replies }} resp.</span></li>{% endfor %}</ul>
+<section class="step com-bloque" aria-labelledby="debate-lectores">
+ <h2 class="section-label" id="debate-lectores">Debate de lectores</h2>
+ {% if _deb[0] %}<ul class="com-bloque-lista">{% for t in _deb[0][:3] %}<li><a href="/comunidad/{{ t.id }}">{{ t.title }}</a> <span class="meta">{{ t.replies }} resp.</span></li>{% endfor %}</ul>
  {% else %}<p class="meta">Nadie ha abierto todavía un debate sobre este hecho.</p>{% endif %}
- <p class="meta">{% if _deb[1] %}<a href="/comunidad?hecho={{ fact.id }}">Ver los {{ _deb[1] }} debates</a> · {% endif %}<a href="/comunidad/nuevo?hecho={{ fact.id }}">Abrir debate sobre este hecho</a></p>
+ <p class="meta">Opiniones, no evidencia. {% if _deb[1] %}<a href="/comunidad?hecho={{ fact.id }}">Ver los {{ _deb[1] }} debates</a> · {% endif %}<a href="/comunidad/nuevo?hecho={{ fact.id }}">Abrir debate sobre este hecho</a></p>
 </section>

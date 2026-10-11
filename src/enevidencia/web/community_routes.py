@@ -287,7 +287,7 @@ def moderation_action(request: Request, accion: str = Form(""), kind: str = Form
 def install_community(app: FastAPI, db) -> Community:
     """Crea tablas, registra el filtro `comtexto`, la función `debates_de_hecho` y las rutas."""
     app.state.community_db = db
-    com = app.state.community = Community(db.conn)
+    com = app.state.community = Community(db)
     env = app.state.templates.env
     env.filters["comtexto"] = texto
     env.globals["debates_de_hecho"] = lambda fact_id: com.threads_for_fact(fact_id)

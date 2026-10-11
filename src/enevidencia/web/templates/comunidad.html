@@ -1,34 +1,32 @@
-{% extends "base.html" %}{% from "comunidad_macros.html" import normas, autor, paginacion %}
+{% extends "base.html" %}{% from "comunidad_macros.html" import autor, paginacion %}
 {% from "macros.html" import error as aviso_error %}
 {% block title %}Comunidad · EnEvidencia{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/community.css">{% endblock %}
 {% block content %}
-<div class="com">
+<div class="com narrow">
  <header class="com-head">
   <p class="kicker">Comunidad</p><h1>Cartas al director</h1>
-  <p class="dek">Tribuna abierta de lectores: dudas sobre el método, fuentes que echamos en falta, errores que corregir. Son opiniones, no evidencia.</p>
+  <p class="dek">Tribuna abierta de lectores: dudas sobre el método, fuentes que echamos en falta, errores que corregir. Son opiniones, no evidencia. <a href="/normas">Normas</a>.</p>
   {% if fact %}<p class="meta">Debates sobre el hecho: <a href="/facts/{{ fact.id }}">{{ fact.title }}</a> · <a href="/comunidad">Ver todos</a></p>{% endif %}
+  {% if user %}<p class="actions"><a class="btn" href="/comunidad/nuevo{% if fact %}?hecho={{ fact.id }}{% endif %}">Escribir una carta</a></p>
+  {% else %}<p class="meta">Entra o crea una cuenta para participar: <a href="/entrar?next=/comunidad">Entrar</a> · <a href="/registro?next=/comunidad">Crear cuenta</a></p>{% endif %}
  </header>
- {{ normas() }}
  {% if aviso %}<div class="notice" role="status"><p>{{ aviso }}</p></div>{% endif %}
  <form class="com-filtros" method="get" action="/comunidad" role="search">
-  <label for="q">Buscar</label><input id="q" name="q" value="{{ q }}" maxlength="80" placeholder="Palabras del título o del texto">
-  <label for="cat">Sección</label>
-  <select id="cat" name="categoria"><option value="">Todas</option>{% for c in categories %}<option value="{{ c }}" {% if c == cat %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+  <label class="sr-only" for="q">Buscar</label><input id="q" name="q" value="{{ q }}" maxlength="80" placeholder="Buscar en las cartas">
+  <label class="sr-only" for="cat">Sección</label>
+  <select id="cat" name="categoria"><option value="">Todas las secciones</option>{% for c in categories %}<option value="{{ c }}" {% if c == cat %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
   {% if hecho %}<input type="hidden" name="hecho" value="{{ hecho }}">{% endif %}
-  <button class="small">Filtrar</button>
-  {% if user %}<a class="btn small secondary" href="/comunidad/nuevo{% if fact %}?hecho={{ fact.id }}{% endif %}">Escribir una carta</a>
-  {% else %}<span class="meta">Entra o crea una cuenta para participar: <a href="/entrar?next=/comunidad">Entrar</a> · <a href="/registro?next=/comunidad">Crear cuenta</a></span>{% endif %}
+  <button class="secondary small">Filtrar</button>
  </form>
  {% if threads %}
  <ol class="com-lista">
  {% for c in threads %}{% set t = c.r %}
   <li class="com-item{% if t.pinned %} is-pinned{% endif %}">
-   <p class="kicker">{{ t.category }}{% if t.pinned %} · Fijado{% endif %}{% if t.locked %} · Cerrado{% endif %}</p>
    <h2><a href="/comunidad/{{ t.id }}">{% if c.shown %}{{ t.title }}{% else %}[hilo retirado por moderación]{% endif %}</a></h2>
    {% if c.excerpt %}<p class="com-extracto">{{ c.excerpt }}</p>{% endif %}
    {% if c.note %}<p class="meta">{{ c.note }}</p>{% endif %}
-   <p class="meta">{{ autor(t.author, t.author_role) }} · {{ t.replies }} {{ "respuesta" if t.replies == 1 else "respuestas" }} · última actividad {{ t.last_activity[:10] }} {{ t.last_activity[11:16] }}</p>
+   <p class="meta">{{ t.category }}{% if t.pinned %} · fijado{% endif %}{% if t.locked %} · cerrado{% endif %} · {{ autor(t.author, t.author_role) }} · {{ t.replies }} {{ "respuesta" if t.replies == 1 else "respuestas" }} · {{ t.last_activity[:10] }}</p>
   </li>
  {% endfor %}
  </ol>

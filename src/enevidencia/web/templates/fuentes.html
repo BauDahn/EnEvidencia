@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% from "macros.html" import tipo %}
+{% block title %}Fuentes · EnEvidencia{% endblock %}
+{% block content %}
+<div class="narrow">
+ <p class="kicker">Archivo</p><h1>Fuentes</h1>
+ <p class="dek">{{ total }} fuente{{ "" if total == 1 else "s" }} en el archivo, de la más reciente a la más antigua.</p>
+ {% if sources %}
+ <ul class="rows">{% for s in sources %}
+  <li><a class="row-title" href="/sources/{{ s.id }}">{{ s.title or s.url }}</a>
+   <span class="meta">{{ s.outlet or "medio desconocido" }} · {{ s.published|fecha }} · {{ s.source_type.label }}</span></li>{% endfor %}
+ </ul>
+ {% if pages > 1 %}<nav class="pager" aria-label="Paginación">
+  {% if page > 1 %}<a href="/fuentes?p={{ page - 1 }}" rel="prev">« Anterior</a>{% endif %}
+  <span>Página {{ page }} de {{ pages }}</span>
+  {% if page < pages %}<a href="/fuentes?p={{ page + 1 }}" rel="next">Siguiente »</a>{% endif %}</nav>{% endif %}
+ {% else %}<div class="empty"><p>El archivo de fuentes está vacío.</p></div>{% endif %}
+</div>
+{% endblock %}

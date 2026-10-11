@@ -132,7 +132,7 @@ def rules(request: Request):
 
 def install_auth(app: FastAPI, db: Storage, templates) -> Accounts:
     """Registra cuentas, CSRF, cabeceras y rutas. Llamar justo después de crear la app y la base."""
-    app.state.accounts = Accounts(db.conn)
+    app.state.accounts = Accounts(db)
     app.state.templates = templates
 
     def ctx(request: Request) -> dict:
